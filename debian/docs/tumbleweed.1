@@ -1,0 +1,55 @@
+.\" generated with Ronn/v0.7.3
+.\" http://github.com/rtomayko/ronn/tree/0.7.3
+.
+.TH "TUMBLEWEED" "1" "February 2013" "" ""
+.
+.SH "NAME"
+\fBtumbleweed\fR \- Instant webserver
+.
+.SH "SYNOPSIS"
+\fBtumbleweed\fR [\-d] [\-1] [\-s directory] [\-p port] [\-i index] [\-u username]
+.
+.SH "DESCRIPTION"
+\fBtumbleweed\fR is a simple webserver for static content with a low memory footprint for the Linux OS\. It uses the Linux EPOLL event system, does non\-blocking IO, supports Zero\-Copy and uses all the cores you have\. It is actually quite fast\. Though only a few HTTP features are supported such as HTTP Pipelining, Keep\-alive and Range Requests as seen in the wild\.
+.
+.SH "OPTIONS"
+.
+.TP
+\fB\-s\fR \fIdirectory\fR
+Share this directory\. (Default: ~/Public)
+.
+.TP
+\fB\-p\fR \fIport\fR
+Listen to this port\. (Default: TCP/8080)
+.
+.TP
+\fB\-i\fR \fIindex\fR
+Serve this file if the requested entity is a directory\. (Default: index\.html)
+.
+.TP
+\fB\-u\fR \fIusername\fR
+When starting as root, use \-u to change the UID\.
+.
+.TP
+\fB\-d\fR
+Start as a daemon and run in background\. The output will be redirected to syslog\.
+.
+.TP
+\fB\-q\fR
+Be quiet and do not log anything\.
+.
+.SH "EXAMPLES"
+Serve \fI~/Public\fR at port \fI8080\fR:
+.
+.IP "" 4
+.
+.nf
+
+$ tumbleweed
+.
+.fi
+.
+.IP "" 0
+.
+.SH "BUGS"
+Not being fully RFC compliant\.

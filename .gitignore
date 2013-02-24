@@ -1,17 +1,7 @@
-# Object files
-*.o
+debian/source/
+debian/tumbleweed.debhelper.log
+debian/tumbleweed/
+tumbleweed/tumbleweed
+debian/files
+debian/tumbleweed.substvars
 
-# Libraries
-*.lib
-*.a
-
-# Shared objects (inc. Windows DLLs)
-*.dll
-*.so
-*.so.*
-*.dylib
-
-# Executables
-*.exe
-*.out
-*.app
