@@ -3,7 +3,7 @@ tumbleweed(1) -- Instant webserver
 
 ## SYNOPSIS
 
-`tumbleweed` [-d] [-1] [-s directory] [-p port] [-i index] [-u username]
+`tumbleweed` [-d] [-q] [-6] [-s directory] [-p port] [-i index] [-u username]
 
 ## DESCRIPTION
 
@@ -32,6 +32,9 @@ Keep-alive and Range Requests as seen in the wild.
 
   * `-q`:
 	Be quiet and do not log anything.
+
+  * `-6`:
+	IPv6 only.
 
 ## EXAMPLES
 

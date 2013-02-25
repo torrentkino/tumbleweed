@@ -7,7 +7,7 @@
 \fBtumbleweed\fR \- Instant webserver
 .
 .SH "SYNOPSIS"
-\fBtumbleweed\fR [\-d] [\-1] [\-s directory] [\-p port] [\-i index] [\-u username]
+\fBtumbleweed\fR [\-d] [\-q] [\-6] [\-s directory] [\-p port] [\-i index] [\-u username]
 .
 .SH "DESCRIPTION"
 \fBtumbleweed\fR is a simple webserver for static content with a low memory footprint for the Linux OS\. It uses the Linux EPOLL event system, does non\-blocking IO, supports Zero\-Copy and uses all the cores you have\. It is actually quite fast\. Though only a few HTTP features are supported such as HTTP Pipelining, Keep\-alive and Range Requests as seen in the wild\.
@@ -37,6 +37,10 @@ Start as a daemon and run in background\. The output will be redirected to syslo
 .TP
 \fB\-q\fR
 Be quiet and do not log anything\.
+.
+.TP
+\fB\-6\fR
+IPv6 only\.
 .
 .SH "EXAMPLES"
 Serve \fI~/Public\fR at port \fI8080\fR:

@@ -82,30 +82,24 @@ void tcp_start( void ) {
 	char buffer[MAIN_BUF+1];
 	int listen_queue_length = SOMAXCONN * 8;
 
-#ifdef IPV4
-	if( (_main->tcp->sockfd = socket( PF_INET, SOCK_STREAM, 0)) < 0 ) {
-		log_fail( "Creating socket failed." );
-	}
-	_main->tcp->s_addr.sin_family = AF_INET;
-	_main->tcp->s_addr.sin_port = htons( _main->conf->port );
-	_main->tcp->s_addr.sin_addr.s_addr = htonl( INADDR_ANY );
-#else
 	if( (_main->tcp->sockfd = socket( PF_INET6, SOCK_STREAM, 0)) < 0 ) {
 		log_fail( "Creating socket failed." );
 	}
+	
 	_main->tcp->s_addr.sin6_family = AF_INET6;
 	_main->tcp->s_addr.sin6_port = htons( _main->conf->port );
 	_main->tcp->s_addr.sin6_addr = in6addr_any;
-#endif
+	
 	if( setsockopt( _main->tcp->sockfd, SOL_SOCKET, SO_REUSEADDR, &_main->tcp->optval, sizeof(int)) == -1 ) {
 		log_fail( "Setting SO_REUSEADDR failed" );
 	}
 
-#ifndef IPV4
-	if( setsockopt( _main->tcp->sockfd, IPPROTO_IPV6, IPV6_V6ONLY, &_main->tcp->optval, sizeof(int)) == -1 ) {
-		log_fail( "Setting IPV6_V6ONLY failed" );
+	if( _main->conf->ipv6_only == TRUE ) {
+		log_info( 0, "IPv4 disabled" );
+		if( setsockopt( _main->tcp->sockfd, IPPROTO_IPV6, IPV6_V6ONLY, &_main->tcp->optval, sizeof(int)) == -1 ) {
+			log_fail( "Setting IPV6_V6ONLY failed" );
+		}
 	}
-#endif
 
 	if( bind( _main->tcp->sockfd, (struct sockaddr *) &_main->tcp->s_addr, _main->tcp->s_addrlen) ) {
 		log_fail( "bind() to socket failed." );

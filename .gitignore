@@ -4,4 +4,4 @@ debian/tumbleweed/
 tumbleweed/tumbleweed
 debian/files
 debian/tumbleweed.substvars
-
+*.o
