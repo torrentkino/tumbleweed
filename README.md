@@ -28,10 +28,10 @@ Keep-alive and Range Requests as seen in the wild.
     When starting as root, use -u to change the UID.
 
   * `-d`:
-	Start as a daemon and run in background. The output will be redirected to syslog.
+	Start as a daemon and run in background. The output will be send to syslog.
 
   * `-q`:
-	Be quiet and do not log anything.
+	Be quiet and do not log anything except warnings.
 
   * `-6`:
 	IPv6 only.
@@ -44,4 +44,4 @@ Serve *~/Public* at port *8080*:
 
 ## BUGS
 
-Not being fully RFC compliant.
+Not being fully blown with funky features.
