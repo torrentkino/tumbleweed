@@ -1,3 +1,8 @@
+tumbleweed (0.2) unstable; urgency=low
+
+  * Logging changes
+
+ -- Aiko Barz <aiko@chroot.de>  Fri, 15 Mar 2013 21:30:00 +0100
 tumbleweed (0.1) unstable; urgency=low
 
   * tumbleweed: Initial release
