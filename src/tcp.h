@@ -35,6 +35,9 @@ struct obj_tcp {
 	pthread_mutex_t *mutex;
 	int id;
 
+	/* Workers active */
+	int active;
+
 	/* Worker */
 	pthread_t **threads;
 	pthread_attr_t attr;
@@ -48,6 +51,7 @@ void tcp_stop( void );
 
 int tcp_nonblocking( int sock );
 void tcp_event( void );
+void tcp_cron( void );
 
 void tcp_pool( void );
 void *tcp_thread( void *arg );

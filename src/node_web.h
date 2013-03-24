@@ -65,6 +65,7 @@ struct obj_node {
 
 	/* HTTP Keep-Alive */
 	char keepalive[MAIN_BUF+1];
+	int keepalive_counter;
 
 	/* HTTP Last-Modified */
 	char lastmodified[MAIN_BUF+1];
@@ -89,7 +90,10 @@ ITEM *node_put( void );
 void node_disconnect( int connfd );
 void node_shutdown( ITEM *thisnode );
 void node_status( NODE *nodeItem, int status );
+void node_activity( NODE *nodeItem );
 
 ssize_t node_appendBuffer( NODE *nodeItem, char *buffer, ssize_t bytes );
 void node_clearSendBuf( NODE *nodeItem );
 void node_clearRecvBuf( NODE *nodeItem );
+
+void node_cleanup( void );

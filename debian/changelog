@@ -1,3 +1,8 @@
+tumbleweed (0.3) unstable; urgency=low
+
+  * Drop idle HTTP sessions in a safe manner.
+
+ -- Aiko Barz <aiko@chroot.de>  Fri, 22 Mar 2013 21:38:00 +0100
 tumbleweed (0.2) unstable; urgency=low
 
   * Logging changes

@@ -65,6 +65,9 @@ struct obj_tcp *tcp_init( void ) {
 	/* Workers running */
 	tcp->id = 0;
 
+	/* Workers active */
+	tcp->active = 0;
+
 	/* Worker */
 	tcp->threads = NULL;
 
@@ -198,15 +201,18 @@ void *tcp_thread( void *arg ) {
 	log_info( 0, buffer );
 
 	for( ;; ) {
-		nfds = epoll_wait( _main->tcp->epollfd, events, TCP_MAX_EVENTS, 1000 );
+		nfds = epoll_wait( _main->tcp->epollfd, events, TCP_MAX_EVENTS, CONF_EPOLL_WAIT );
 
 		if( _main->status == MAIN_ONLINE && nfds == -1 ) {
 			if( errno != EINTR ) {
 				log_info( 500, "epoll_wait() failed" );
-				log_fail( strerror( errno) );
+				log_fail( strerror( errno ) );
 			}
 		} else if( _main->status == MAIN_ONLINE && nfds == 0 ) {
-			/* Timed wakeup. Nothing todo */
+			/* Timed wakeup */
+			if( id == 0 ) {
+				tcp_cron();
+			}
 		} else if( _main->status == MAIN_ONLINE && nfds > 0 ) {
 			tcp_worker( events, nfds, id );
 		} else {
@@ -221,6 +227,10 @@ void *tcp_thread( void *arg ) {
 void tcp_worker( struct epoll_event *events, int nfds, int thrd_id ) {
 	ITEM *listItem = NULL;
 	int i;
+
+	mutex_block( _main->tcp->mutex );
+	_main->tcp->active++;
+	mutex_unblock( _main->tcp->mutex );
 
 	for( i=0; i<nfds; i++ ) {
 		if( events[i].data.fd == _main->tcp->sockfd ) {
@@ -238,6 +248,10 @@ void tcp_worker( struct epoll_event *events, int nfds, int thrd_id ) {
 			tcp_gate( listItem );
 		}
 	}
+
+	mutex_block( _main->tcp->mutex );
+	_main->tcp->active--;
+	mutex_unblock( _main->tcp->mutex );
 }
 
 void tcp_gate( ITEM *listItem ) {
@@ -349,6 +363,11 @@ void tcp_output( ITEM *listItem ) {
 		case NODE_MODE_SEND_MEM:
 		case NODE_MODE_SEND_FILE:
 		case NODE_MODE_SEND_STOP:
+			
+			/* Remember last activity */
+			node_activity( nodeItem );
+			
+			/* Send file */
 			send_exec( nodeItem );
 			break;
 	}
@@ -360,6 +379,10 @@ void tcp_input( ITEM *listItem ) {
 	ssize_t bytes = 0;
 	
 	while( _main->status == MAIN_ONLINE ) {
+
+		/* Remember last activity */
+		node_activity( nodeItem );
+		
 		/* Get data */
 		bytes = recv( nodeItem->connfd, buffer, MAIN_BUF, 0 );
 
@@ -406,4 +429,14 @@ void tcp_buffer( NODE *nodeItem, char *buffer, ssize_t bytes ) {
 	}
 
 	http_buf( nodeItem );
+}
+
+void tcp_cron( void ) {
+	mutex_block( _main->tcp->mutex );
+
+	/* Do some jobs while no worker is running */
+	if( _main->tcp->active == 0 ) {
+		node_cleanup();
+	}
+	mutex_unblock( _main->tcp->mutex );
 }

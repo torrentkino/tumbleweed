@@ -99,6 +99,7 @@ ITEM *node_put( void ) {
 
 	/* HTTP Keep-Alive */
 	memset( nodeItem->keepalive, '\0', MAIN_BUF+1 );
+	nodeItem->keepalive_counter = CONF_KEEPALIVE;
 
 	/* HTTP Last-Modified */
 	memset( nodeItem->lastmodified, '\0', MAIN_BUF+1 );
@@ -154,13 +155,18 @@ void node_disconnect( int connfd ) {
 	}
 
 	/* Close socket */
-	if( close( connfd) != 0 ) {
+	if( close( connfd ) != 0 ) {
 		log_info( 500, "close() failed" );
 	}
 }
 
 void node_status( NODE *nodeItem, int status ) {
 	nodeItem->mode = status;
+}
+
+void node_activity( NODE *nodeItem ) {
+	/* Activity counter */
+	nodeItem->keepalive_counter = CONF_KEEPALIVE;
 }
 
 void node_clearRecvBuf( NODE *nodeItem ) {
@@ -206,4 +212,36 @@ ssize_t node_appendBuffer( NODE *nodeItem, char *buffer, ssize_t bytes ) {
 	nodeItem->recv_buf[nodeItem->recv_size] = '\0';
 
 	return nodeItem->recv_size;
+}
+
+void node_cleanup( void ) {
+	ITEM *thisnode = NULL;
+	ITEM *nextnode = NULL;
+	NODE *nodeItem = NULL;
+	long int i = 0;
+	
+	/* No other worker is running right now */
+
+	if( _main->nodes->list->counter == 0 ) {
+		return;
+	}
+
+	thisnode = _main->nodes->list->start;
+	for( i=0; i<_main->nodes->list->counter; i++ ) {
+
+		nextnode = list_next(thisnode);
+
+		/* node_cleanup gets called every 1000ms and keepalive_counter is set to
+		 * CONF_KEEPALIVE(5) on each event. */
+
+		nodeItem = thisnode->val;
+		if( nodeItem->keepalive_counter <= 0 ) {
+			node_status( nodeItem, NODE_MODE_SHUTDOWN );
+			node_shutdown( thisnode );
+		} else {
+			nodeItem->keepalive_counter--;
+		}
+		
+		thisnode = nextnode;
+	}
 }
