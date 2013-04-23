@@ -182,7 +182,6 @@ void mime_magic( char *filename, char *key ) {
 	struct obj_mimeItem *tuple = NULL;
 	magic_t magic = NULL;
 	const char *mime = NULL;
-	char buffer[MAIN_BUF+1];
 
 	if( ! file_isreg( filename) ) {
 		return;
@@ -210,8 +209,7 @@ void mime_magic( char *filename, char *key ) {
 	/* Clear handle */
 	magic_close( magic );
 
-	snprintf( buffer, MAIN_BUF+1, "New MIME: \"%s\" -> \"%s\"", tuple->key, tuple->val );
-	log_info( 0, buffer );
+	log_info( NULL, 0, "New MIME: \"%s\" -> \"%s\"", tuple->key, tuple->val );
 }
 #endif
 

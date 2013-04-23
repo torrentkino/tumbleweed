@@ -108,7 +108,6 @@ void send_mem( NODE *nodeItem ) {
 void send_file( NODE *nodeItem ) {
 	ssize_t bytes_sent = 0;
 	int fh = 0;
-	char buffer[MAIN_BUF+1];
 
 	if( nodeItem->mode != NODE_MODE_SEND_FILE ) {
 		return;
@@ -141,8 +140,7 @@ void send_file( NODE *nodeItem ) {
 	while( _main->status == MAIN_ONLINE ) {
 		fh = open( nodeItem->filename, O_RDONLY );	
 		if( fh < 0 ) {
-			snprintf( buffer, MAIN_BUF+1, "Failed to open %s", nodeItem->filename );
-			log_info( 500, buffer );
+			log_info( NULL, 500, "Failed to open %s", nodeItem->filename );
 			log_fail( strerror( errno) );
 		}
 	
@@ -150,8 +148,7 @@ void send_file( NODE *nodeItem ) {
 		bytes_sent = sendfile( nodeItem->connfd, fh, &nodeItem->f_offset, nodeItem->content_length );
 	
 		if( close( fh) != 0 ) {
-			snprintf( buffer, MAIN_BUF+1, "Failed to close %s", nodeItem->filename );
-			log_info( 500, buffer );
+			log_info( NULL, 500, "Failed to close %s", nodeItem->filename );
 			log_fail( strerror( errno) );
 		}
 

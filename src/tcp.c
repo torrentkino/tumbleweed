@@ -82,7 +82,6 @@ void tcp_free( void ) {
 }
 
 void tcp_start( void ) {
-	char buffer[MAIN_BUF+1];
 	int listen_queue_length = SOMAXCONN * 8;
 
 	if( (_main->tcp->sockfd = socket( PF_INET6, SOCK_STREAM, 0)) < 0 ) {
@@ -98,7 +97,7 @@ void tcp_start( void ) {
 	}
 
 	if( _main->conf->ipv6_only == TRUE ) {
-		log_info( 0, "IPv4 disabled" );
+		log_info( NULL, 0, "IPv4 disabled" );
 		if( setsockopt( _main->tcp->sockfd, IPPROTO_IPV6, IPV6_V6ONLY, &_main->tcp->optval, sizeof(int)) == -1 ) {
 			log_fail( "Setting IPV6_V6ONLY failed" );
 		}
@@ -115,8 +114,7 @@ void tcp_start( void ) {
 	if( listen( _main->tcp->sockfd, listen_queue_length) ) {
 		log_fail( "listen() to socket failed." );
 	} else {
-		snprintf( buffer, MAIN_BUF+1, "Listen queue length: %i", listen_queue_length );
-		log_info( 0, buffer );
+		log_info( NULL, 0, "Listen queue length: %i", listen_queue_length );
 	}
 
 	/* Drop privileges */
@@ -189,7 +187,6 @@ void tcp_pool( void ) {
 
 void *tcp_thread( void *arg ) {
 	struct epoll_event events[TCP_MAX_EVENTS];
-	char buffer[MAIN_BUF+1];
 	int nfds;
 	int id = 0;
 
@@ -197,15 +194,14 @@ void *tcp_thread( void *arg ) {
 	id = _main->tcp->id++;
 	mutex_unblock( _main->tcp->mutex );
 	
-	snprintf( buffer, MAIN_BUF+1, "Thread[%i] - Max events: %i", id, TCP_MAX_EVENTS );
-	log_info( 0, buffer );
+	log_info( NULL, 0, "Thread[%i] - Max events: %i", id, TCP_MAX_EVENTS );
 
 	for( ;; ) {
 		nfds = epoll_wait( _main->tcp->epollfd, events, TCP_MAX_EVENTS, CONF_EPOLL_WAIT );
 
 		if( _main->status == MAIN_ONLINE && nfds == -1 ) {
 			if( errno != EINTR ) {
-				log_info( 500, "epoll_wait() failed" );
+				log_info( NULL, 500, "epoll_wait() failed" );
 				log_fail( strerror( errno ) );
 			}
 		} else if( _main->status == MAIN_ONLINE && nfds == 0 ) {
@@ -288,7 +284,7 @@ void tcp_rearm( ITEM *listItem, int mode ) {
 	ev.data.ptr = listItem;
 
 	if( epoll_ctl( _main->tcp->epollfd, EPOLL_CTL_MOD, nodeItem->connfd, &ev) == -1 ) {
-		log_info( 500, strerror( errno) );
+		log_info( NULL, 500, strerror( errno ) );
 		log_fail( "tcp_rearm: epoll_ctl() failed" );
 	}
 }
@@ -330,7 +326,7 @@ void tcp_newconn( void ) {
 
 		/* New connection: Create node object */
 		if( (listItem = node_put()) == NULL ) {
-			log_info( 500, "The linked list reached its limits" );
+			log_info( NULL, 500, "The linked list reached its limits" );
 			node_disconnect( connfd );
 			break;
 		}
@@ -349,7 +345,7 @@ void tcp_newconn( void ) {
 		ev.events = EPOLLET | EPOLLIN | EPOLLONESHOT;
 		ev.data.ptr = listItem;
 		if( epoll_ctl( _main->tcp->epollfd, EPOLL_CTL_ADD, nodeItem->connfd, &ev) == -1 ) {
-			log_info( 500, strerror( errno) );
+			log_info( NULL, 500, strerror( errno ) );
 			log_fail( "tcp_newconn: epoll_ctl() failed" );
 		}
 	}
@@ -392,13 +388,13 @@ void tcp_input( ITEM *listItem ) {
 			} else if( errno == ECONNRESET ) {
 				/*
 				 * Very common behaviour
-				 * log_complex( nodeItem, 0, "Connection reset by peer" );
+				 * log_info( &nodeItem->c_addr, 0, "Connection reset by peer" );
 				 */
 				node_status( nodeItem, NODE_MODE_SHUTDOWN );
 				return;
 			} else {
-				log_complex( nodeItem, 0, "recv() failed:" );
-				log_complex( nodeItem, 0, strerror( errno) );
+				log_info( &nodeItem->c_addr, 0, "recv() failed:" );
+				log_info( &nodeItem->c_addr, 0, strerror( errno) );
 				return;
 			}
 		} else if( bytes == 0 ) {
@@ -423,7 +419,7 @@ void tcp_buffer( NODE *nodeItem, char *buffer, ssize_t bytes ) {
 
 	/* Overflow? */
 	if( nodeItem->recv_size >= MAIN_BUF ) {
-		log_complex( nodeItem, 0, "Max head buffer exceeded..." );
+		log_info( &nodeItem->c_addr, 500, "Max head buffer exceeded..." );
 		node_status( nodeItem, NODE_MODE_SHUTDOWN );
 		return;
 	}
