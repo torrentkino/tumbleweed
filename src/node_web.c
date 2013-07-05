@@ -57,7 +57,7 @@ void nodes_free( void ) {
 
 	/* list_free() does not catch the node->buffer */
 	while( _main->nodes->list->start != NULL ) {
-		nodeItem = _main->nodes->list->start->val;
+		nodeItem = list_value( _main->nodes->list->start );
 		node_status( nodeItem, NODE_MODE_SHUTDOWN );
 		node_shutdown( _main->nodes->list->start );
 	}
@@ -129,7 +129,7 @@ ITEM *node_put( void ) {
 }
 
 void node_shutdown( ITEM *thisnode ) {
-	NODE *nodeItem = thisnode->val;
+	NODE *nodeItem = list_value( thisnode );
 
 	/* Close socket */
 	node_disconnect( nodeItem->connfd );
@@ -234,7 +234,7 @@ void node_cleanup( void ) {
 		/* node_cleanup gets called every 1000ms and keepalive_counter is set to
 		 * CONF_KEEPALIVE(5) on each event. */
 
-		nodeItem = thisnode->val;
+		nodeItem = list_value( thisnode );
 		if( nodeItem->keepalive_counter <= 0 ) {
 			node_status( nodeItem, NODE_MODE_SHUTDOWN );
 			node_shutdown( thisnode );

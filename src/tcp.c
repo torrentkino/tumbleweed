@@ -251,7 +251,7 @@ void tcp_worker( struct epoll_event *events, int nfds, int thrd_id ) {
 }
 
 void tcp_gate( ITEM *listItem ) {
-	NODE *nodeItem = listItem->val;
+	NODE *nodeItem = list_value( listItem );
 
 	switch( nodeItem->mode ) {
 		case NODE_MODE_SHUTDOWN:
@@ -272,7 +272,7 @@ void tcp_gate( ITEM *listItem ) {
 }
 
 void tcp_rearm( ITEM *listItem, int mode ) {
-	NODE *nodeItem = listItem->val;
+	NODE *nodeItem = list_value( listItem );
 	struct epoll_event ev;
 
 	if( mode == TCP_INPUT ) {
@@ -332,7 +332,7 @@ void tcp_newconn( void ) {
 		}
 		
 		/* Store data */
-		nodeItem = listItem->val;
+		nodeItem = list_value( listItem );
 		nodeItem->connfd = connfd;
 		memcpy( &nodeItem->c_addr, &c_addr, c_addrlen );
 		nodeItem->c_addrlen = c_addrlen;
@@ -352,7 +352,7 @@ void tcp_newconn( void ) {
 }
 
 void tcp_output( ITEM *listItem ) {
-	NODE *nodeItem = listItem->val;
+	NODE *nodeItem = list_value( listItem );
 	
 	switch( nodeItem->mode ) {
 		case NODE_MODE_SEND_INIT:
@@ -370,7 +370,7 @@ void tcp_output( ITEM *listItem ) {
 }
 
 void tcp_input( ITEM *listItem ) {
-	NODE *nodeItem = listItem->val;
+	NODE *nodeItem = list_value( listItem );
 	char buffer[MAIN_BUF+1];
 	ssize_t bytes = 0;
 	
