@@ -199,17 +199,17 @@ void *tcp_thread( void *arg ) {
 	for( ;; ) {
 		nfds = epoll_wait( _main->tcp->epollfd, events, TCP_MAX_EVENTS, CONF_EPOLL_WAIT );
 
-		if( _main->status == MAIN_ONLINE && nfds == -1 ) {
+		if( _main->status == RUMBLE && nfds == -1 ) {
 			if( errno != EINTR ) {
 				log_info( NULL, 500, "epoll_wait() failed" );
 				log_fail( strerror( errno ) );
 			}
-		} else if( _main->status == MAIN_ONLINE && nfds == 0 ) {
+		} else if( _main->status == RUMBLE && nfds == 0 ) {
 			/* Timed wakeup */
 			if( id == 0 ) {
 				tcp_cron();
 			}
-		} else if( _main->status == MAIN_ONLINE && nfds > 0 ) {
+		} else if( _main->status == RUMBLE && nfds > 0 ) {
 			tcp_worker( events, nfds, id );
 		} else {
 			/* Shutdown server */
@@ -374,7 +374,7 @@ void tcp_input( ITEM *listItem ) {
 	char buffer[MAIN_BUF+1];
 	ssize_t bytes = 0;
 	
-	while( _main->status == MAIN_ONLINE ) {
+	while( _main->status == RUMBLE ) {
 
 		/* Remember last activity */
 		node_activity( nodeItem );

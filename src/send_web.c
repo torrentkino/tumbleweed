@@ -79,7 +79,7 @@ void send_mem( NODE *nodeItem ) {
 	int bytes_todo = 0;
 	char *p = NULL;
 
-	while( _main->status == MAIN_ONLINE ) {
+	while( _main->status == RUMBLE ) {
 		p = nodeItem->send_buf + nodeItem->send_offset;
 		bytes_todo = nodeItem->send_size - nodeItem->send_offset;
 	
@@ -137,7 +137,7 @@ void send_file( NODE *nodeItem ) {
 		return;
 	}
 
-	while( _main->status == MAIN_ONLINE ) {
+	while( _main->status == RUMBLE ) {
 		fh = open( nodeItem->filename, O_RDONLY );	
 		if( fh < 0 ) {
 			log_info( NULL, 500, "Failed to open %s", nodeItem->filename );

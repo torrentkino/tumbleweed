@@ -148,7 +148,7 @@ void node_shutdown( ITEM *thisnode ) {
 void node_disconnect( int connfd ) {
 	/* Remove FD from the watchlist */
 	if( epoll_ctl( _main->tcp->epollfd, EPOLL_CTL_DEL, connfd, NULL) == -1 ) {
-		if( _main->status == MAIN_ONLINE ) {
+		if( _main->status == RUMBLE ) {
 			log_info( NULL, 500, strerror( errno ) );
 			log_fail( "node_shutdown: epoll_ctl() failed" );
 		}
