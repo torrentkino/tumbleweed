@@ -276,6 +276,8 @@ void tcp_rearm( ITEM *listItem, int mode ) {
 	NODE *nodeItem = list_value( listItem );
 	struct epoll_event ev;
 
+	memset(&ev, '\0', sizeof( struct epoll_event ) );
+
 	if( mode == TCP_INPUT ) {
 		ev.events = EPOLLET | EPOLLIN | EPOLLONESHOT;
 	} else {
