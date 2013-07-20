@@ -53,14 +53,16 @@ NODES *nodes_init( void ) {
 }
 
 void nodes_free( void ) {
-	NODE *nodeItem = NULL;
+	ITEM *item = NULL;
+	NODE *node = NULL;
 
-	/* list_free() does not catch the node->buffer */
-	while( _main->nodes->list->start != NULL ) {
-		nodeItem = list_value( _main->nodes->list->start );
-		node_status( nodeItem, NODE_MODE_SHUTDOWN );
-		node_shutdown( _main->nodes->list->start );
+	while( ( item = list_start( _main->nodes->list ) ) != NULL ) {
+		node = list_value( item );
+
+		node_status( node, NODE_MODE_SHUTDOWN );
+		node_shutdown( item );
 	}
+
 	list_free( _main->nodes->list );
 	mutex_destroy( _main->nodes->mutex );
 	myfree( _main->nodes, "nodes_free" );
@@ -218,16 +220,13 @@ void node_cleanup( void ) {
 	ITEM *thisnode = NULL;
 	ITEM *nextnode = NULL;
 	NODE *nodeItem = NULL;
-	long int i = 0;
 	
-	/* No other worker is running right now */
-
-	if( _main->nodes->list->counter == 0 ) {
+	if( list_size( _main->nodes->list ) == 0 ) {
 		return;
 	}
 
-	thisnode = _main->nodes->list->start;
-	for( i=0; i<_main->nodes->list->counter; i++ ) {
+	thisnode = list_start( _main->nodes->list );
+	while( thisnode != NULL ) {
 
 		nextnode = list_next(thisnode);
 

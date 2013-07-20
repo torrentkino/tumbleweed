@@ -161,6 +161,7 @@ void tcp_event( void ) {
 		log_fail( "epoll_create() failed" );
 	}
 
+	memset(&ev, '\0', sizeof( struct epoll_event ) );
 	ev.events = EPOLLIN | EPOLLET;
 	ev.data.fd = _main->tcp->sockfd;
 	if( epoll_ctl( _main->tcp->epollfd, EPOLL_CTL_ADD, _main->tcp->sockfd, &ev) == -1 ) {
@@ -205,7 +206,7 @@ void *tcp_thread( void *arg ) {
 				log_fail( strerror( errno ) );
 			}
 		} else if( _main->status == RUMBLE && nfds == 0 ) {
-			/* Timed wakeup */
+			/* Timeout wakeup */
 			if( id == 0 ) {
 				tcp_cron();
 			}
@@ -394,7 +395,7 @@ void tcp_input( ITEM *listItem ) {
 				return;
 			} else {
 				log_info( &nodeItem->c_addr, 0, "recv() failed:" );
-				log_info( &nodeItem->c_addr, 0, strerror( errno) );
+				log_info( &nodeItem->c_addr, 0, strerror( errno ) );
 				return;
 			}
 		} else if( bytes == 0 ) {

@@ -127,22 +127,21 @@ void mime_load( void ) {
 void mime_hash( void ) {
 	ITEM *item = NULL;
 	struct obj_mimeItem *tuple = NULL;
-	long int i = 0;
 	
-	if( _main->mime->list->counter < 1 ) {
+	if( list_size( _main->mime->list ) < 1 ) {
 		return;
 	}
 
 	/* Create hash */
-	_main->mime->hash = hash_init( _main->mime->list->counter*10 );
+	_main->mime->hash = hash_init( list_size( _main->mime->list ) * 10 );
 
 	/* Hash list */
-	item = _main->mime->list->start;
-	for( i=0; i<_main->mime->list->counter; i++ ) {
+	item = list_start( _main->mime->list );
+	while( item != NULL ) {
 		tuple = item->val;
 		hash_put( _main->mime->hash, (UCHAR *)tuple->key, strlen( tuple->key), tuple->val );
 		item = list_next( item );
-	};
+	}
 }
 
 const char *mime_find( char *filename ) {
