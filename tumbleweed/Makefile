@@ -6,8 +6,8 @@ POST_LINKING = -lpthread
 POST_LINKING += -lmagic
 SUBDIRS =
 OBJS=conf.o file.o hash.o http.o list.o log.o \
-	main.o malloc.o mime.o node_web.o opts.o \
-	send_web.o str.o tcp.o thrd.o unix.o
+	malloc.o mime.o node_web.o opts.o \
+	send_web.o str.o tcp.o thrd.o tumbleweed.o unix.o
 
 .PHONY: all clean install $(SUBDIRS)
 

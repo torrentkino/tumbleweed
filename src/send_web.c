@@ -36,7 +36,7 @@ along with masala/tumbleweed.  If not, see <http://www.gnu.org/licenses/>.
 #include <netinet/tcp.h>
 
 #include "malloc.h"
-#include "main.h"
+#include "tumbleweed.h"
 #include "thrd.h"
 #include "str.h"
 #include "conf.h"

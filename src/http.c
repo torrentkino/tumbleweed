@@ -29,7 +29,7 @@ along with masala/tumbleweed.  If not, see <http://www.gnu.org/licenses/>.
 #include <unistd.h>
 #include <dirent.h>
 
-#include "main.h"
+#include "tumbleweed.h"
 #include "malloc.h"
 #include "conf.h"
 #include "str.h"

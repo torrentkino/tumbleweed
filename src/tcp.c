@@ -36,7 +36,7 @@ along with masala/tumbleweed.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "malloc.h"
 #include "thrd.h"
-#include "main.h"
+#include "tumbleweed.h"
 #include "str.h"
 #include "list.h"
 #include "node_web.h"

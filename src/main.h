@@ -17,6 +17,9 @@ You should have received a copy of the GNU General Public License
 along with masala/tumbleweed.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifndef MAKRO_H
+#define MAKRO_H
+
 #define MAIN_BUF 1023
 #define MAIN_PROTVER 1
 #define MAIN_IPBUF 39
@@ -28,39 +31,11 @@ along with masala/tumbleweed.  If not, see <http://www.gnu.org/licenses/>.
 #define GAMEOVER 0
 #define RUMBLE 1
 
+#define TIMEOUT 10
+
 typedef unsigned long int ULONG;
 typedef unsigned char UCHAR;
 typedef long int LONG;
 typedef struct sockaddr_in6 IP;
 
-struct obj_main {
-	int argc;
-	char **argv;
-
-	/* Data */
-	struct obj_conf	*conf;
-#ifdef TUMBLEWEED
-	struct obj_mime *mime;
-	struct obj_tcp *tcp;
-	struct obj_nodes *nodes;
-#elif MASALA
-	struct obj_transaction *transaction;
-	struct obj_infohash *infohash;
-	struct obj_token *token;
-	struct obj_nbhd *nbhd;
-	struct obj_udp *udp;
-	struct obj_p2p *p2p;
 #endif
-
-	/* Thread terminater */
-	int status;
-
-	/* Catch signals */
-	struct sigaction sig_stop;
-	struct sigaction sig_time;
-};
-
-extern struct obj_main *_main;
-
-struct obj_main *main_init( int argc, char **argv );
-void main_free( void );
