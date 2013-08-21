@@ -68,7 +68,7 @@ void send_cork_start( NODE *nodeItem ) {
 	int on = 1;
 
 	if( setsockopt( nodeItem->connfd, IPPROTO_TCP, TCP_CORK, &on, sizeof(on)) != 0 ) {
-		log_fail( strerror( errno) );
+		fail( strerror( errno) );
 	}
 	
 	node_status( nodeItem, NODE_MODE_SEND_MEM );
@@ -140,16 +140,16 @@ void send_file( NODE *nodeItem ) {
 	while( _main->status == RUMBLE ) {
 		fh = open( nodeItem->filename, O_RDONLY );	
 		if( fh < 0 ) {
-			log_info( NULL, 500, "Failed to open %s", nodeItem->filename );
-			log_fail( strerror( errno) );
+			info( NULL, 500, "Failed to open %s", nodeItem->filename );
+			fail( strerror( errno) );
 		}
 	
 		/* The SIGPIPE gets catched in sig.c */
 		bytes_sent = sendfile( nodeItem->connfd, fh, &nodeItem->f_offset, nodeItem->content_length );
 	
 		if( close( fh) != 0 ) {
-			log_info( NULL, 500, "Failed to close %s", nodeItem->filename );
-			log_fail( strerror( errno) );
+			info( NULL, 500, "Failed to close %s", nodeItem->filename );
+			fail( strerror( errno) );
 		}
 
 		if( bytes_sent < 0 ) {
@@ -180,7 +180,7 @@ void send_cork_stop( NODE *nodeItem ) {
 	}
 
 	if( setsockopt( nodeItem->connfd, IPPROTO_TCP, TCP_CORK, &off, sizeof(off)) != 0 ) {
-		log_fail( strerror( errno) );
+		fail( strerror( errno) );
 	}
 
 	/* Clear input and output buffers */

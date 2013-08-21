@@ -71,7 +71,7 @@ struct obj_mimeItem *mime_add( const char *key, const char *value ) {
 	strncpy( tuple->val, value, MIME_VALLEN );
 
 	if( list_put( _main->mime->list, tuple) == NULL ) {
-		log_fail( "mime_add: List exhausted" );
+		fail( "mime_add: List exhausted" );
 	}
 
 	if( _main->mime->hash != NULL ) {
@@ -208,7 +208,7 @@ void mime_magic( char *filename, char *key ) {
 	/* Clear handle */
 	magic_close( magic );
 
-	log_info( NULL, 0, "New MIME: \"%s\" -> \"%s\"", tuple->key, tuple->val );
+	info( NULL, 0, "New MIME: \"%s\" -> \"%s\"", tuple->key, tuple->val );
 }
 #endif
 

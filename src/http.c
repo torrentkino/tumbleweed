@@ -50,16 +50,16 @@ long int http_urlDecode( char *src, long int srclen, char *dst, long int dstlen 
 	unsigned int hex = 0;
 
 	if( src == NULL ) {
-		log_info( NULL, 400, "http_urlDecode(): URL is NULL" );
+		info( NULL, 400, "http_urlDecode(): URL is NULL" );
 		return 0;
 	} else if( dst == NULL ) {
-		log_info( NULL, 400, "http_urlDecode(): Destination is broken" );
+		info( NULL, 400, "http_urlDecode(): Destination is broken" );
 		return 0;
 	} else if( dstlen <= 0 ) {
-		log_info( NULL, 400, "http_urlDecode(): Destination length is <= 0" );
+		info( NULL, 400, "http_urlDecode(): Destination length is <= 0" );
 		return 0;
 	} else if( srclen <= 0 ) {
-		log_info( NULL, 400, "http_urlDecode(): URL length is <= 0" );
+		info( NULL, 400, "http_urlDecode(): URL length is <= 0" );
 		return 0;
 	}
 	
@@ -76,13 +76,13 @@ long int http_urlDecode( char *src, long int srclen, char *dst, long int dstlen 
 			/* Safety check */
 			if( (long int)(src+srclen-p1) <= 2 ) {
 				/* Path is broken: There should have been two more characters */
-				log_info( NULL, 500, "http_urlDecode(): Broken url" );
+				info( NULL, 500, "http_urlDecode(): Broken url" );
 				return 0;
 			}
 
 			if( !sscanf( ++p1,"%2x",&hex) ) {
 				/* Path is broken: Broken characters */
-				log_info( NULL, 500, "http_urlDecode(): Broken characters" );
+				info( NULL, 500, "http_urlDecode(): Broken characters" );
 				return 0;
 			}
 			
@@ -112,7 +112,7 @@ HASH *http_hashHeader( char *head ) {
 	/* Compute hash size */
 	head_counter = str_count( head, "\r\n" );
 	if( head_counter >= 100 ) {
-		log_info( NULL, 400, "More than 100 headers?!" );
+		info( NULL, 400, "More than 100 headers?!" );
 		return NULL;
 	} else if( head_counter <= 0 ) {
 		/* HTTP/1.0 */
@@ -142,7 +142,7 @@ HASH *http_hashHeader( char *head ) {
 			hash_put( hash, (UCHAR *)var, strlen( var), val );
 		
 		} else {
-			log_info( NULL, 400, "Missing ':' in header?!" );
+			info( NULL, 400, "Missing ':' in header?!" );
 			hash_free( hash );
 			return NULL;
 		}
@@ -201,7 +201,7 @@ void http_buf( NODE *nodeItem ) {
 
 	/* Find url */
 	if( (p_url = strchr( p_cmd, ' ')) == NULL ) {
-		log_info( &nodeItem->c_addr, 400, "Requested URL was not found" );
+		info( &nodeItem->c_addr, 400, "Requested URL was not found" );
 		node_status( nodeItem, NODE_MODE_SHUTDOWN );
 		return;
 	}
@@ -209,7 +209,7 @@ void http_buf( NODE *nodeItem ) {
 
 	/* Find protocol type */
 	if( (p_proto = strchr( p_url, ' ')) == NULL ) {
-		log_info( &nodeItem->c_addr, 400, "No protocol found in request" );
+		info( &nodeItem->c_addr, 400, "No protocol found in request" );
 		node_status( nodeItem, NODE_MODE_SHUTDOWN );
 		return;
 	}
@@ -222,7 +222,7 @@ void http_buf( NODE *nodeItem ) {
 
 	/* Find header lines */
 	if( (p_head = strstr( p_proto, "\r\n")) == NULL ) {
-		log_info( &nodeItem->c_addr, 400, "Impossible. There must be a \\r\\n. I put it there..." );
+		info( &nodeItem->c_addr, 400, "Impossible. There must be a \\r\\n. I put it there..." );
 		node_status( nodeItem, NODE_MODE_SHUTDOWN );
 		return;
 	}
@@ -272,14 +272,14 @@ int http_check( NODE *nodeItem, char *p_cmd, char *p_url, char *p_proto ) {
 	} else if( strncmp( p_cmd, "HEAD", 4) == 0 ) {
 		nodeItem->type = HTTP_HEAD;
 	} else {
-		log_info( &nodeItem->c_addr, 400, "Invalid request type: %s", p_cmd );
+		info( &nodeItem->c_addr, 400, "Invalid request type: %s", p_cmd );
 		node_status( nodeItem, NODE_MODE_SHUTDOWN );
 		return 0;
 	}
 
 	/* Protocol */
 	if( strncmp( p_proto, "HTTP/1.1", 8) != 0 && strncmp( p_proto, "HTTP/1.0", 8) != 0 ) {
-		log_info( &nodeItem->c_addr, 400, "Invalid protocol: %s", p_proto );
+		info( &nodeItem->c_addr, 400, "Invalid protocol: %s", p_proto );
 		node_status( nodeItem, NODE_MODE_SHUTDOWN );
 		return 0;
 	}
@@ -291,14 +291,14 @@ int http_check( NODE *nodeItem, char *p_cmd, char *p_url, char *p_proto ) {
 
 	/* URL */
 	if( !http_urlDecode( p_url, strlen( p_url), nodeItem->entity_url, MAIN_BUF+1) ) {
-		log_info( &nodeItem->c_addr, 400, "Decoding URL failed" );
+		info( &nodeItem->c_addr, 400, "Decoding URL failed" );
 		node_status( nodeItem, NODE_MODE_SHUTDOWN );
 		return 0;
 	}
 
 	/* Minimum path requirement */
 	if( nodeItem->entity_url[0] != '/' ) {
-		log_info( &nodeItem->c_addr, 400, "URL must start with '/': %s",
+		info( &nodeItem->c_addr, 400, "URL must start with '/': %s",
 			nodeItem->entity_url );
 		node_status( nodeItem, NODE_MODE_SHUTDOWN );
 		return 0;
@@ -306,7 +306,7 @@ int http_check( NODE *nodeItem, char *p_cmd, char *p_url, char *p_proto ) {
 
 	/* ".." in path. Do not like. */
 	if( strstr( nodeItem->entity_url, "../") != NULL ) {
-		log_info( &nodeItem->c_addr, 400, "Double dots: %s",
+		info( &nodeItem->c_addr, 400, "Double dots: %s",
 			nodeItem->entity_url );
 		node_status( nodeItem, NODE_MODE_SHUTDOWN );
 		return 0;
@@ -314,7 +314,7 @@ int http_check( NODE *nodeItem, char *p_cmd, char *p_url, char *p_proto ) {
  
 	/* URL */
 	if( ! str_isValidUTF8( nodeItem->entity_url) ) {
-		log_info( &nodeItem->c_addr, 400, "Invalid UTF8 in URL" );
+		info( &nodeItem->c_addr, 400, "Invalid UTF8 in URL" );
 		node_status( nodeItem, NODE_MODE_SHUTDOWN );
 		return 0;
 	}
@@ -381,21 +381,21 @@ void http_gate( NODE *nodeItem, HASH *head ) {
 	switch( nodeItem->code ) {
 		case 200:
 			http_200( nodeItem );
-			log_info( &nodeItem->c_addr, nodeItem->code, nodeItem->entity_url );
+			info( &nodeItem->c_addr, nodeItem->code, nodeItem->entity_url );
 			break;
 		case 206:
 			http_206( nodeItem );
-			log_info( &nodeItem->c_addr, nodeItem->code,
+			info( &nodeItem->c_addr, nodeItem->code,
 				"%s [%s]", nodeItem->entity_url,
 				(char *)hash_get(head, (UCHAR *)"Range", 5));
 			break;
 		case 304:
 			http_304( nodeItem );
-			log_info( &nodeItem->c_addr, nodeItem->code, nodeItem->entity_url );
+			info( &nodeItem->c_addr, nodeItem->code, nodeItem->entity_url );
 			break;
 		case 404:
 			http_404( nodeItem );
-			log_info( &nodeItem->c_addr, nodeItem->code, nodeItem->entity_url );
+			info( &nodeItem->c_addr, nodeItem->code, nodeItem->entity_url );
 			break;
 	}
 }
@@ -436,14 +436,14 @@ void http_size( NODE *nodeItem, HASH *head ) {
 	p_start = range;
 
 	if ( strncmp(p_start, "bytes=", 6) != 0 ) {
-		log_info( &nodeItem->c_addr, 206, "Broken Range[1]: %s", 
+		info( &nodeItem->c_addr, 206, "Broken Range[1]: %s", 
 			(char *)hash_get(head, (UCHAR *)"Range", 5));
 		return;
 	}
 	p_start += 6;
 
 	if ( (p_stop = strchr(p_start, '-')) == NULL ) {
-		log_info( &nodeItem->c_addr, 206, "Broken Range[2]: %s",
+		info( &nodeItem->c_addr, 206, "Broken Range[2]: %s",
 			(char *)hash_get(head, (UCHAR *)"Range", 5));
 		return;
 	}
@@ -454,7 +454,7 @@ void http_size( NODE *nodeItem, HASH *head ) {
 	} else if ( str_isNumber(p_start) ) {
 		nodeItem->range_start = atol(p_start);
 	} else {
-		log_info( &nodeItem->c_addr, 206, "Broken Range[3]: %s",
+		info( &nodeItem->c_addr, 206, "Broken Range[3]: %s",
 			(char *)hash_get(head, (UCHAR *)"Range", 5));
 		return;
 	}
@@ -464,19 +464,19 @@ void http_size( NODE *nodeItem, HASH *head ) {
 	} else if ( str_isNumber(p_stop) ) {
 		nodeItem->range_stop = atol(p_stop);
 	} else {
-		log_info( &nodeItem->c_addr, 206,
+		info( &nodeItem->c_addr, 206,
 			"Broken Range[4]: %s", (char *)hash_get(head, (UCHAR *)"Range", 5));
 		return;
 	}
 	
 	if ( nodeItem->range_start < 0 || nodeItem->range_start >= nodeItem->filesize ) {
-		log_info( &nodeItem->c_addr, 206,
+		info( &nodeItem->c_addr, 206,
 			"Broken Range[5]: %s", (char *)hash_get(head, (UCHAR *)"Range", 5));
 		return;
 	}
 	
 	if ( nodeItem->range_stop < nodeItem->range_start || nodeItem->range_stop >= nodeItem->filesize ) {
-	   	log_info( &nodeItem->c_addr, 206,
+	   	info( &nodeItem->c_addr, 206,
 			"Broken Range[7]: %s", (char *)hash_get(head, (UCHAR *)"Range", 5));
 	   	return;
 	}

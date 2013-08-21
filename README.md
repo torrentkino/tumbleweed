@@ -31,7 +31,7 @@ Keep-alive and Range Requests as seen in the wild.
 	Start as a daemon and run in background. The output will be send to syslog.
 
   * `-q`:
-	Be quiet and do not log anything except warnings.
+	Be quiet and do not log anything.
 
   * `-6`:
 	IPv6 only.

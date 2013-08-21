@@ -85,7 +85,7 @@ void tcp_start( void ) {
 	int listen_queue_length = SOMAXCONN * 8;
 
 	if( (_main->tcp->sockfd = socket( PF_INET6, SOCK_STREAM, 0)) < 0 ) {
-		log_fail( "Creating socket failed." );
+		fail( "Creating socket failed." );
 	}
 	
 	_main->tcp->s_addr.sin6_family = AF_INET6;
@@ -93,28 +93,28 @@ void tcp_start( void ) {
 	_main->tcp->s_addr.sin6_addr = in6addr_any;
 	
 	if( setsockopt( _main->tcp->sockfd, SOL_SOCKET, SO_REUSEADDR, &_main->tcp->optval, sizeof(int)) == -1 ) {
-		log_fail( "Setting SO_REUSEADDR failed" );
+		fail( "Setting SO_REUSEADDR failed" );
 	}
 
 	if( _main->conf->ipv6_only == TRUE ) {
-		log_info( NULL, 0, "IPv4 disabled" );
+		info( NULL, 0, "IPv4 disabled" );
 		if( setsockopt( _main->tcp->sockfd, IPPROTO_IPV6, IPV6_V6ONLY, &_main->tcp->optval, sizeof(int)) == -1 ) {
-			log_fail( "Setting IPV6_V6ONLY failed" );
+			fail( "Setting IPV6_V6ONLY failed" );
 		}
 	}
 
 	if( bind( _main->tcp->sockfd, (struct sockaddr *) &_main->tcp->s_addr, _main->tcp->s_addrlen) ) {
-		log_fail( "bind() to socket failed." );
+		fail( "bind() to socket failed." );
 	}
 
 	if( tcp_nonblocking( _main->tcp->sockfd) < 0 ) {
-		log_fail( "tcp_nonblocking( _main->tcp->sockfd) failed" );
+		fail( "tcp_nonblocking( _main->tcp->sockfd) failed" );
 	}
 	
 	if( listen( _main->tcp->sockfd, listen_queue_length) ) {
-		log_fail( "listen() to socket failed." );
+		fail( "listen() to socket failed." );
 	} else {
-		log_info( NULL, 0, "Listen queue length: %i", listen_queue_length );
+		info( NULL, 0, "Listen queue length: %i", listen_queue_length );
 	}
 
 	/* Drop privileges */
@@ -134,7 +134,7 @@ void tcp_stop( void ) {
 	pthread_attr_destroy( &_main->tcp->attr );
 	for( i=0; i < _main->conf->cores; i++ ) {
 		if( pthread_join( *_main->tcp->threads[i], NULL) != 0 ) {
-			log_fail( "pthread_join() failed" );
+			fail( "pthread_join() failed" );
 		}
 		myfree( _main->tcp->threads[i], "tcp_pool" );
 	}
@@ -142,15 +142,15 @@ void tcp_stop( void ) {
 
 	/* Shutdown socket */
 	if( shutdown( _main->tcp->sockfd, SHUT_RDWR) != 0 )
-		log_fail( "shutdown() failed." );
+		fail( "shutdown() failed." );
 
 	/* Close socket */
 	if( close( _main->tcp->sockfd) != 0 )
-		log_fail( "close() failed." );
+		fail( "close() failed." );
 
 	/* Close epoll */
 	if( close( _main->tcp->epollfd) != 0 )
-		log_fail( "close() failed." );
+		fail( "close() failed." );
 }
 
 void tcp_event( void ) {
@@ -158,14 +158,14 @@ void tcp_event( void ) {
 	
 	_main->tcp->epollfd = epoll_create( 23 );
 	if( _main->tcp->epollfd == -1 ) {
-		log_fail( "epoll_create() failed" );
+		fail( "epoll_create() failed" );
 	}
 
 	memset(&ev, '\0', sizeof( struct epoll_event ) );
 	ev.events = EPOLLIN | EPOLLET;
 	ev.data.fd = _main->tcp->sockfd;
 	if( epoll_ctl( _main->tcp->epollfd, EPOLL_CTL_ADD, _main->tcp->sockfd, &ev) == -1 ) {
-		log_fail( "tcp_event: epoll_ctl() failed" );
+		fail( "tcp_event: epoll_ctl() failed" );
 	}
 }
 
@@ -181,7 +181,7 @@ void tcp_pool( void ) {
 	for( i=0; i < _main->conf->cores; i++ ) {
 		_main->tcp->threads[i] = (pthread_t *) myalloc( sizeof(pthread_t), "tcp_pool" );
 		if( pthread_create( _main->tcp->threads[i], &_main->tcp->attr, tcp_thread, NULL) != 0 ) {
-			log_fail( "pthread_create()" );
+			fail( "pthread_create()" );
 		}
 	}
 }
@@ -195,15 +195,15 @@ void *tcp_thread( void *arg ) {
 	id = _main->tcp->id++;
 	mutex_unblock( _main->tcp->mutex );
 	
-	log_info( NULL, 0, "Thread[%i] - Max events: %i", id, TCP_MAX_EVENTS );
+	info( NULL, 0, "Thread[%i] - Max events: %i", id, TCP_MAX_EVENTS );
 
 	for( ;; ) {
 		nfds = epoll_wait( _main->tcp->epollfd, events, TCP_MAX_EVENTS, CONF_EPOLL_WAIT );
 
 		if( _main->status == RUMBLE && nfds == -1 ) {
 			if( errno != EINTR ) {
-				log_info( NULL, 500, "epoll_wait() failed" );
-				log_fail( strerror( errno ) );
+				info( NULL, 500, "epoll_wait() failed" );
+				fail( strerror( errno ) );
 			}
 		} else if( _main->status == RUMBLE && nfds == 0 ) {
 			/* Timeout wakeup */
@@ -268,7 +268,7 @@ void tcp_gate( ITEM *listItem ) {
 			tcp_rearm( listItem, TCP_OUTPUT );
 			break;
 		default:
-			log_fail( "No shit" );
+			fail( "No shit" );
 	}
 }
 
@@ -287,8 +287,8 @@ void tcp_rearm( ITEM *listItem, int mode ) {
 	ev.data.ptr = listItem;
 
 	if( epoll_ctl( _main->tcp->epollfd, EPOLL_CTL_MOD, nodeItem->connfd, &ev) == -1 ) {
-		log_info( NULL, 500, strerror( errno ) );
-		log_fail( "tcp_rearm: epoll_ctl() failed" );
+		info( NULL, 500, strerror( errno ) );
+		fail( "tcp_rearm: epoll_ctl() failed" );
 	}
 }
 
@@ -323,13 +323,13 @@ void tcp_newconn( void ) {
 			if( errno == EAGAIN || errno == EWOULDBLOCK ) {
 				break;
 			} else {
-				log_fail( strerror( errno) );
+				fail( strerror( errno) );
 			}
 		}
 
 		/* New connection: Create node object */
 		if( (listItem = node_put()) == NULL ) {
-			log_info( NULL, 500, "The linked list reached its limits" );
+			info( NULL, 500, "The linked list reached its limits" );
 			node_disconnect( connfd );
 			break;
 		}
@@ -342,14 +342,14 @@ void tcp_newconn( void ) {
 
 		/* Non blocking */
 		if( tcp_nonblocking( nodeItem->connfd) < 0 ) {
-			log_fail( "tcp_nonblocking() failed" );
+			fail( "tcp_nonblocking() failed" );
 		}
 
 		ev.events = EPOLLET | EPOLLIN | EPOLLONESHOT;
 		ev.data.ptr = listItem;
 		if( epoll_ctl( _main->tcp->epollfd, EPOLL_CTL_ADD, nodeItem->connfd, &ev) == -1 ) {
-			log_info( NULL, 500, strerror( errno ) );
-			log_fail( "tcp_newconn: epoll_ctl() failed" );
+			info( NULL, 500, strerror( errno ) );
+			fail( "tcp_newconn: epoll_ctl() failed" );
 		}
 	}
 }
@@ -391,13 +391,13 @@ void tcp_input( ITEM *listItem ) {
 			} else if( errno == ECONNRESET ) {
 				/*
 				 * Very common behaviour
-				 * log_info( &nodeItem->c_addr, 0, "Connection reset by peer" );
+				 * info( &nodeItem->c_addr, 0, "Connection reset by peer" );
 				 */
 				node_status( nodeItem, NODE_MODE_SHUTDOWN );
 				return;
 			} else {
-				log_info( &nodeItem->c_addr, 0, "recv() failed:" );
-				log_info( &nodeItem->c_addr, 0, strerror( errno ) );
+				info( &nodeItem->c_addr, 0, "recv() failed:" );
+				info( &nodeItem->c_addr, 0, strerror( errno ) );
 				return;
 			}
 		} else if( bytes == 0 ) {
@@ -417,12 +417,12 @@ void tcp_buffer( NODE *nodeItem, char *buffer, ssize_t bytes ) {
 	node_appendBuffer( nodeItem, buffer, bytes );
 
 	if( nodeItem->mode != NODE_MODE_READY ) {
-		log_fail( "FIXME tcp_buffer..." );
+		fail( "FIXME tcp_buffer..." );
 	}
 
 	/* Overflow? */
 	if( nodeItem->recv_size >= MAIN_BUF ) {
-		log_info( &nodeItem->c_addr, 500, "Max head buffer exceeded..." );
+		info( &nodeItem->c_addr, 500, "Max head buffer exceeded..." );
 		node_status( nodeItem, NODE_MODE_SHUTDOWN );
 		return;
 	}
