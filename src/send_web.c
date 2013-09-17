@@ -68,7 +68,7 @@ void send_cork_start( NODE *nodeItem ) {
 	int on = 1;
 
 	if( setsockopt( nodeItem->connfd, IPPROTO_TCP, TCP_CORK, &on, sizeof(on)) != 0 ) {
-		fail( strerror( errno) );
+		fail( strerror( errno ) );
 	}
 	
 	node_status( nodeItem, NODE_MODE_SEND_MEM );

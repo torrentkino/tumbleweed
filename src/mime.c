@@ -145,12 +145,12 @@ void mime_hash( void ) {
 }
 
 const char *mime_find( char *filename ) {
-	char filecopy[MAIN_BUF+1];
+	char filecopy[BUF_SIZE];
 	char *key = NULL;
 	char *mime = NULL;
 
 	/* Copy filename */
-	snprintf( filecopy, MAIN_BUF+1, "%s", filename );
+	snprintf( filecopy, BUF_SIZE, "%s", filename );
 
 	/* Get extension */
 	if( (key = mime_extension( filecopy)) == NULL ) {

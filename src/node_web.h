@@ -41,19 +41,19 @@ struct obj_node {
 	socklen_t c_addrlen;
 
 	/* Receive buffer */
-	char recv_buf[MAIN_BUF+1];
+	char recv_buf[BUF_SIZE];
 	ssize_t recv_size;
 
 	/* Send buffer */
-	char send_buf[MAIN_BUF+1];
+	char send_buf[BUF_SIZE];
 	int send_size;
 	int send_offset;
 
 	/* URL */
-	char entity_url[MAIN_BUF+1];
+	char entity_url[BUF_SIZE];
 
 	/* File meta data */
-	char filename[MAIN_BUF+1];
+	char filename[BUF_SIZE];
 	size_t filesize;
 	off_t f_offset;
 	off_t f_stop;
@@ -64,11 +64,11 @@ struct obj_node {
 	off_t range_stop;
 
 	/* HTTP Keep-Alive */
-	char keepalive[MAIN_BUF+1];
+	char keepalive[BUF_SIZE];
 	int keepalive_counter;
 
 	/* HTTP Last-Modified */
-	char lastmodified[MAIN_BUF+1];
+	char lastmodified[BUF_SIZE];
 
 	/* HTTP code */
 	int code;

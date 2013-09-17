@@ -374,7 +374,7 @@ void tcp_output( ITEM *listItem ) {
 
 void tcp_input( ITEM *listItem ) {
 	NODE *nodeItem = list_value( listItem );
-	char buffer[MAIN_BUF+1];
+	char buffer[BUF_SIZE];
 	ssize_t bytes = 0;
 	
 	while( _main->status == RUMBLE ) {
@@ -383,7 +383,7 @@ void tcp_input( ITEM *listItem ) {
 		node_activity( nodeItem );
 		
 		/* Get data */
-		bytes = recv( nodeItem->connfd, buffer, MAIN_BUF, 0 );
+		bytes = recv( nodeItem->connfd, buffer, BUF_OFF1, 0 );
 
 		if( bytes < 0 ) {
 			if( errno == EAGAIN || errno == EWOULDBLOCK ) {
@@ -421,7 +421,7 @@ void tcp_buffer( NODE *nodeItem, char *buffer, ssize_t bytes ) {
 	}
 
 	/* Overflow? */
-	if( nodeItem->recv_size >= MAIN_BUF ) {
+	if( nodeItem->recv_size >= BUF_OFF1 ) {
 		info( &nodeItem->c_addr, 500, "Max head buffer exceeded..." );
 		node_status( nodeItem, NODE_MODE_SHUTDOWN );
 		return;

@@ -77,19 +77,19 @@ ITEM *node_put( void ) {
 	memset( (char *) &nodeItem->c_addr, '\0', nodeItem->c_addrlen );
 
 	/* Receive buffer */
-	memset( nodeItem->recv_buf, '\0', MAIN_BUF+1 );
+	memset( nodeItem->recv_buf, '\0', BUF_SIZE );
 	nodeItem->recv_size = 0;
 	
 	/* Send buffer */
-	memset( nodeItem->send_buf, '\0', MAIN_BUF+1 );
+	memset( nodeItem->send_buf, '\0', BUF_SIZE );
 	nodeItem->send_offset = 0;
 	nodeItem->send_size = 0;
 
 	/* Entity url */
-	memset( nodeItem->entity_url, '\0', MAIN_BUF+1 );
+	memset( nodeItem->entity_url, '\0', BUF_SIZE );
 
 	/* File metadata */
-	memset( nodeItem->filename, '\0', MAIN_BUF+1 );
+	memset( nodeItem->filename, '\0', BUF_SIZE );
 	nodeItem->filesize = 0;
 	nodeItem->f_offset = 0;
 	nodeItem->f_stop = 0;
@@ -100,11 +100,11 @@ ITEM *node_put( void ) {
 	nodeItem->range_stop = 0;
 
 	/* HTTP Keep-Alive */
-	memset( nodeItem->keepalive, '\0', MAIN_BUF+1 );
+	memset( nodeItem->keepalive, '\0', BUF_SIZE );
 	nodeItem->keepalive_counter = CONF_KEEPALIVE;
 
 	/* HTTP Last-Modified */
-	memset( nodeItem->lastmodified, '\0', MAIN_BUF+1 );
+	memset( nodeItem->lastmodified, '\0', BUF_SIZE );
 
 	/* HTTP code */
 	nodeItem->code = 0;
@@ -172,19 +172,19 @@ void node_activity( NODE *nodeItem ) {
 }
 
 void node_clearRecvBuf( NODE *nodeItem ) {
-	memset( nodeItem->recv_buf, '\0', MAIN_BUF+1 );
+	memset( nodeItem->recv_buf, '\0', BUF_SIZE );
 	nodeItem->recv_size = 0;
 }
 
 void node_clearSendBuf( NODE *nodeItem ) {
-	memset( nodeItem->send_buf, '\0', MAIN_BUF+1 );
+	memset( nodeItem->send_buf, '\0', BUF_SIZE );
 	nodeItem->send_size = 0;
 	nodeItem->send_offset = 0;
 
-	memset( nodeItem->filename, '\0', MAIN_BUF+1 );
-	memset( nodeItem->keepalive, '\0', MAIN_BUF+1 );
-	memset( nodeItem->lastmodified, '\0', MAIN_BUF+1 );
-	memset( nodeItem->entity_url, '\0', MAIN_BUF+1 );
+	memset( nodeItem->filename, '\0', BUF_SIZE );
+	memset( nodeItem->keepalive, '\0', BUF_SIZE );
+	memset( nodeItem->lastmodified, '\0', BUF_SIZE );
+	memset( nodeItem->entity_url, '\0', BUF_SIZE );
 	nodeItem->filesize = 0;
 	nodeItem->f_offset = 0;
 	nodeItem->f_stop = 0;
@@ -198,7 +198,7 @@ void node_clearSendBuf( NODE *nodeItem ) {
 
 ssize_t node_appendBuffer( NODE *nodeItem, char *buffer, ssize_t bytes ) {
 	char *p = nodeItem->recv_buf + nodeItem->recv_size;
-	ssize_t buf_free = MAIN_BUF - nodeItem->recv_size;
+	ssize_t buf_free = BUF_OFF1 - nodeItem->recv_size;
 	ssize_t buf_copy = (bytes > buf_free) ? buf_free : bytes;
 
 	/* No space left in buffer */

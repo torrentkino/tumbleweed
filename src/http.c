@@ -164,7 +164,7 @@ void http_buf( NODE *nodeItem ) {
 	char *p_head = NULL;
 	char *p_body = NULL;
 	HASH *head = NULL;
-	char recv_buf[MAIN_BUF+1];
+	char recv_buf[BUF_SIZE];
 
 	/* Do not start before at least this much arrived: "GET / HTTP/1.1" */
 	if( nodeItem->recv_size <= 14 ) {
@@ -172,7 +172,7 @@ void http_buf( NODE *nodeItem ) {
 	}
 
 	/* Copy HTTP request */
-	memset( recv_buf, '\0', MAIN_BUF+1 );
+	memset( recv_buf, '\0', BUF_SIZE );
 	memcpy( recv_buf, nodeItem->recv_buf, nodeItem->recv_size );
 
 	/* Return until the header is complete. Gets killed if this grows beyond all imaginations. */
@@ -189,7 +189,7 @@ void http_buf( NODE *nodeItem ) {
 	/* HTTP Pipelining: There is at least one more request. */
 	if( nodeItem->recv_size > (ssize_t)(p_body-recv_buf) ) {
 		nodeItem->recv_size -= (ssize_t)(p_body-recv_buf );
-		memset( nodeItem->recv_buf, '\0', MAIN_BUF+1 );
+		memset( nodeItem->recv_buf, '\0', BUF_SIZE );
 		memcpy( nodeItem->recv_buf, p_body, nodeItem->recv_size );
 	} else {
 		/* The request has been copied. Reset the receive buffer. */
@@ -290,7 +290,7 @@ int http_check( NODE *nodeItem, char *p_cmd, char *p_url, char *p_proto ) {
 	}
 
 	/* URL */
-	if( !http_urlDecode( p_url, strlen( p_url), nodeItem->entity_url, MAIN_BUF+1) ) {
+	if( !http_urlDecode( p_url, strlen( p_url), nodeItem->entity_url, BUF_SIZE) ) {
 		info( &nodeItem->c_addr, 400, "Decoding URL failed" );
 		node_status( nodeItem, NODE_MODE_SHUTDOWN );
 		return 0;
@@ -323,7 +323,7 @@ int http_check( NODE *nodeItem, char *p_cmd, char *p_url, char *p_proto ) {
 }
 
 void http_code( NODE *nodeItem ) {
-	snprintf( nodeItem->filename, MAIN_BUF+1, "%s%s", _main->conf->home, nodeItem->entity_url );
+	snprintf( nodeItem->filename, BUF_SIZE, "%s%s", _main->conf->home, nodeItem->entity_url );
 
 	if( file_isreg( nodeItem->filename) ) {
 		
@@ -333,7 +333,7 @@ void http_code( NODE *nodeItem ) {
 	} else if( file_isdir( nodeItem->filename) ) {
 
 		/* There is a index.html file within that directory? */
-		snprintf( nodeItem->filename, MAIN_BUF+1, "%s%s/%s", _main->conf->home, nodeItem->entity_url, _main->conf->index_name );
+		snprintf( nodeItem->filename, BUF_SIZE, "%s%s/%s", _main->conf->home, nodeItem->entity_url, _main->conf->index_name );
 		
 		if( file_isreg( nodeItem->filename) ) {
 			nodeItem->code = 200;
@@ -348,26 +348,26 @@ void http_code( NODE *nodeItem ) {
 }
 
 void http_keepalive( NODE *nodeItem, HASH *head ) {
-	memset( nodeItem->keepalive, '\0', MAIN_BUF+1 );
+	memset( nodeItem->keepalive, '\0', BUF_SIZE );
 
 	if( hash_exists( head, (UCHAR *)"Connection",  10) ) {
 		if( strcasecmp( (char *)hash_get( head, (UCHAR *)"Connection", 10), "Keep-Alive") == 0 ) {
-			snprintf( nodeItem->keepalive, MAIN_BUF+1, "Connection: %s\r\n",
+			snprintf( nodeItem->keepalive, BUF_SIZE, "Connection: %s\r\n",
 				(char *)hash_get( head, (UCHAR *)"Connection", 10) );
 		}
 	}
 }
 
 void http_lastmodified( NODE *nodeItem, HASH *head ) {
-	char entity_time[MAIN_BUF+1];
+	char entity_time[BUF_SIZE];
 
 	if( nodeItem->code != 200 || !file_isreg( nodeItem->filename) ) {
 		return;
 	}
 
-	str_gmttime( entity_time, MAIN_BUF+1, file_mod( nodeItem->filename) );
+	str_gmttime( entity_time, BUF_SIZE, file_mod( nodeItem->filename) );
 
-	snprintf( nodeItem->lastmodified, MAIN_BUF+1, "Last-Modified: %s\r\n", entity_time );
+	snprintf( nodeItem->lastmodified, BUF_SIZE, "Last-Modified: %s\r\n", entity_time );
 
 	if( hash_exists( head, (UCHAR *)"If-Modified-Since",  17) ) {
 		if( strcmp( entity_time, (char *)hash_get( head, (UCHAR *)"If-Modified-Since", 17)) == 0 ) {
@@ -414,7 +414,7 @@ void http_send( NODE *nodeItem ) {
 void http_size( NODE *nodeItem, HASH *head ) {
 	char *p_start = NULL;
 	char *p_stop = NULL;
-	char range[MAIN_BUF+1];
+	char range[BUF_SIZE];
 
  	/* Not a valid file */
 	if ((nodeItem->code != 200 && nodeItem->code != 304) || !file_isreg(nodeItem->filename)) {
@@ -431,8 +431,8 @@ void http_size( NODE *nodeItem, HASH *head ) {
 		return;
 	}
 
-	strncpy(range, (char *)hash_get(head, (UCHAR *)"Range", 5), MAIN_BUF);
-	range[MAIN_BUF] = '\0';
+	strncpy(range, (char *)hash_get(head, (UCHAR *)"Range", 5), BUF_OFF1);
+	range[BUF_OFF1] = '\0';
 	p_start = range;
 
 	if ( strncmp(p_start, "bytes=", 6) != 0 ) {
@@ -490,8 +490,8 @@ void http_size( NODE *nodeItem, HASH *head ) {
 }
 
 void http_404( NODE *nodeItem ) {
-	char datebuf[MAIN_BUF+1];
-	char buffer[MAIN_BUF+1] = 
+	char datebuf[BUF_SIZE];
+	char buffer[BUF_SIZE] = 
 	"<!DOCTYPE html>"
 	"<html lang=\"en\" xml:lang=\"en\">"
 	"<head>"
@@ -510,9 +510,9 @@ void http_404( NODE *nodeItem ) {
 	}
 	
 	/* Compute GMT time */
-	str_GMTtime( datebuf, MAIN_BUF+1 );
+	str_GMTtime( datebuf, BUF_SIZE );
 
-	snprintf( nodeItem->send_buf, MAIN_BUF+1,
+	snprintf( nodeItem->send_buf, BUF_SIZE,
 	"%s 404 Not found\r\n"
 	"Date: %s\r\n"
 	"Server: %s\r\n"
@@ -525,7 +525,7 @@ void http_404( NODE *nodeItem ) {
 }
 
 void http_304( NODE *nodeItem ) {
-	char datebuf[MAIN_BUF+1];
+	char datebuf[BUF_SIZE];
 	char protocol[9] = "HTTP/1.1";
 	
 	if( nodeItem->proto == HTTP_1_0 ) {
@@ -533,9 +533,9 @@ void http_304( NODE *nodeItem ) {
 	}
 	
 	/* Compute GMT time */
-	str_GMTtime( datebuf, MAIN_BUF+1 );
+	str_GMTtime( datebuf, BUF_SIZE );
 
-	snprintf( nodeItem->send_buf, MAIN_BUF+1,
+	snprintf( nodeItem->send_buf, BUF_SIZE,
 	"%s 304 Not Modified\r\n"
 	"Date: %s\r\n"
 	"Server: %s\r\n"
@@ -545,7 +545,7 @@ void http_304( NODE *nodeItem ) {
 }
 
 void http_200( NODE *nodeItem ) {
-	char datebuf[MAIN_BUF+1];
+	char datebuf[BUF_SIZE];
 	const char *mimetype = NULL;
 	char protocol[9] = "HTTP/1.1";
 	
@@ -554,13 +554,13 @@ void http_200( NODE *nodeItem ) {
 	}
 	
 	/* Compute GMT time */
-	str_GMTtime( datebuf, MAIN_BUF+1 );
+	str_GMTtime( datebuf, BUF_SIZE );
 
 	/* Compute mime type */
 	mimetype = mime_find( nodeItem->filename );
 
 	/* Compute answer */
-	snprintf( nodeItem->send_buf, MAIN_BUF+1,
+	snprintf( nodeItem->send_buf, BUF_SIZE,
 	"%s 200 OK\r\n"
 	"Date: %s\r\n"
 	"Server: %s\r\n"
@@ -577,7 +577,7 @@ void http_200( NODE *nodeItem ) {
 }
 
 void http_206( NODE *nodeItem ) {
-	char datebuf[MAIN_BUF+1];
+	char datebuf[BUF_SIZE];
 	const char *mimetype = NULL;
 	char protocol[9] = "HTTP/1.1";
 	
@@ -585,10 +585,10 @@ void http_206( NODE *nodeItem ) {
 		strncpy(protocol, "HTTP/1.0", 8);
 	}
 
-	str_GMTtime(datebuf, MAIN_BUF+1);
+	str_GMTtime(datebuf, BUF_SIZE);
 	mimetype = mime_find(nodeItem->filename);
 
-	snprintf(nodeItem->send_buf, MAIN_BUF+1,
+	snprintf(nodeItem->send_buf, BUF_SIZE,
 	"%s 206 OK\r\n"
 	"Date: %s\r\n"
 	"Server: %s\r\n"
