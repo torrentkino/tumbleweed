@@ -1,20 +1,20 @@
 /*
 Copyright 2006 Aiko Barz
 
-This file is part of masala/tumbleweed.
+This file is part of torrentkino.
 
-masala/tumbleweed is free software: you can redistribute it and/or modify
+torrentkino is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-masala/tumbleweed is distributed in the hope that it will be useful,
+torrentkino is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with masala/tumbleweed.  If not, see <http://www.gnu.org/licenses/>.
+along with torrentkino.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include <stdio.h>
@@ -22,23 +22,12 @@ along with masala/tumbleweed.  If not, see <http://www.gnu.org/licenses/>.
 #include <string.h>
 #include <signal.h>
 #include <pthread.h>
-#include <semaphore.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <arpa/inet.h>
 
-#ifdef TUMBLEWEED
-#include "malloc.h"
-#include "main.h"
-#include "list.h"
-#include "node_web.h"
-#include "log.h"
 #include "str.h"
-#include "conf.h"
-#else
-#include "str.h"
-#endif
 
 int str_isValidUTF8( char *string ) {
 	unsigned int i = 0, j = 0, n = 0;
@@ -134,11 +123,11 @@ int str_isValidFilename( char *string ) {
 	return 1;
 }
 
-int str_isValidHostname( const char *hostname, int size ) {
+int str_valid_hostname( const char *hostname, int hostsize ) {
 
 	int i = 0;
 	
-	for( i=0; i<size; i++ ) {
+	for( i=0; i<hostsize; i++ ) {
 		if( hostname[i] >= '0' && hostname[i] <= '9' ) {
 			continue;
 		} else if( hostname[i] >= 'A' && hostname[i] <= 'Z' ) {
@@ -154,6 +143,30 @@ int str_isValidHostname( const char *hostname, int size ) {
 		} else {
 			return 0;
 		}
+	}
+
+	return 1;
+}
+
+int str_valid_tld( const char *hostname, int hostsize ) {
+
+	const char *p0 = NULL;
+	char *p1 = NULL;
+
+	/* "x.p2p" */
+	if( hostsize < 5 ) {
+		return 0;
+	}
+
+	/* Jump to the last '.' */
+	p0 = hostname;
+	while( ( p1 = strchr( p0, '.')) != NULL ) {
+		p0 = p1+1;
+	}
+
+	/* TLD must be ".p2p" */
+	if( strcmp( p0,"p2p") != 0 ) {
+		return 0;
 	}
 
 	return 1;
@@ -279,3 +292,24 @@ char *str_append( char *buf1, long int size1, char *buf2, long int size2 ) {
 	return buf1;
 }
 */
+
+int str_sha1_compare(UCHAR *id1, UCHAR *id2, UCHAR *target) {
+	UCHAR xor1;
+	UCHAR xor2;
+	int i = 0;
+
+	for( i=0; i<SHA1_SIZE; i++ ) {
+		if( id1[i] == id2[i] ) {
+			continue;
+		}
+		xor1 = id1[i] ^ target[i];
+		xor2 = id2[i] ^ target[i];
+		if( xor1 < xor2 ) {
+			return -1;
+		} else {
+			return 1;
+		}
+	}
+
+	return 0;
+}

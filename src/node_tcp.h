@@ -1,21 +1,30 @@
 /*
 Copyright 2010 Aiko Barz
 
-This file is part of masala/tumbleweed.
+This file is part of torrentkino.
 
-masala/tumbleweed is free software: you can redistribute it and/or modify
+torrentkino is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-masala/tumbleweed is distributed in the hope that it will be useful,
+torrentkino is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with masala/tumbleweed.  If not, see <http://www.gnu.org/licenses/>.
+along with torrentkino.  If not, see <http://www.gnu.org/licenses/>.
 */
+
+#ifndef NODE_TCP_H
+#define NODE_TCP_H
+
+#include "tumbleweed.h"
+#include "thrd.h"
+#include "hash.h"
+#include "list.h"
+#include "log.h"
 
 #define NODE_MODE_READY   	1
 #define NODE_MODE_SEND_INIT 3
@@ -27,15 +36,7 @@ along with masala/tumbleweed.  If not, see <http://www.gnu.org/licenses/>.
 #define NODE_HANDSHAKE_READY 0
 #define NODE_HANDSHAKE_ESTABLISHED 1
 
-struct obj_nodes {
-	LIST *list;
-	
-	/* Safe access to the linked list */
-	pthread_mutex_t *mutex;
-};
-typedef struct obj_nodes NODES;
-
-struct obj_node {
+typedef struct {
 	int connfd;
 	IP c_addr;
 	socklen_t c_addrlen;
@@ -56,19 +57,21 @@ struct obj_node {
 	char filename[BUF_SIZE];
 	size_t filesize;
 	off_t f_offset;
+#ifdef RANGE
 	off_t f_stop;
 	size_t content_length;
 
 	/* HTTP Range */
 	off_t range_start;
 	off_t range_stop;
+#endif
 
 	/* HTTP Keep-Alive */
-	char keepalive[BUF_SIZE];
+	int keepalive;
 	int keepalive_counter;
 
 	/* HTTP Last-Modified */
-	char lastmodified[BUF_SIZE];
+	char lastmodified[DATE_SIZE];
 
 	/* HTTP code */
 	int code;
@@ -80,20 +83,21 @@ struct obj_node {
 	int proto;
 
 	int mode;
-};
-typedef struct obj_node NODE;
+} TCP_NODE;
 
-NODES *nodes_init( void );
-void nodes_free( void );
+LIST *node_init( void );
+void node_free( void );
 
 ITEM *node_put( void );
 void node_disconnect( int connfd );
 void node_shutdown( ITEM *thisnode );
-void node_status( NODE *nodeItem, int status );
-void node_activity( NODE *nodeItem );
+void node_status( TCP_NODE *n, int status );
+void node_activity( TCP_NODE *n );
 
-ssize_t node_appendBuffer( NODE *nodeItem, char *buffer, ssize_t bytes );
-void node_clearSendBuf( NODE *nodeItem );
-void node_clearRecvBuf( NODE *nodeItem );
+ssize_t node_appendBuffer( TCP_NODE *n, char *buffer, ssize_t bytes );
+void node_clearSendBuf( TCP_NODE *n );
+void node_clearRecvBuf( TCP_NODE *n );
 
 void node_cleanup( void );
+
+#endif /* NODE_TCP_H */

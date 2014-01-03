@@ -1,7 +1,7 @@
 Source: tumbleweed
 Section: net
 Priority: extra
-Maintainer: Aiko Barz <aiko@chroot.de>
+Maintainer: Aiko Barz <aiko@torrentkino.de>
 Build-Depends: debhelper (>= 8.0.0)
 Standards-Version: 3.9.4
 Homepage: https://github.com/torrentkino/tumbleweed
@@ -10,4 +10,4 @@ Package: tumbleweed
 Architecture: any
 Depends: ${misc:Depends}, ${shlibs:Depends}
 Description: Instant webserver
- This package includes a simple static command line webserver.
+ Simple static high performance command line webserver.

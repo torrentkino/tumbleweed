@@ -1,5 +1,5 @@
 /*
-Copyright 2006 Aiko Barz
+Copyright 2011 Aiko Barz
 
 This file is part of torrentkino.
 
@@ -17,15 +17,17 @@ You should have received a copy of the GNU General Public License
 along with torrentkino.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef FAIL_H
-#define FAIL_H
+#ifndef NODE_IP_H
+#define NODE_IP_H
 
 #include "main.h"
 
-#ifdef NSS
-#define fail _nss_tk_fail
-#endif
+int ip_is_localhost( IP *from );
+int ip_is_linklocal( IP *from );
 
-void fail( const char *format, ... );
+UCHAR *ip_bytes_to_sin( IP *sin, UCHAR *p );
+UCHAR *ip_sin_to_bytes( IP *sin, UCHAR *p );
 
-#endif
+void ip_merge_port_to_sin( IP *sin, int port );
+
+#endif /* NODE_IP_H */

@@ -1,20 +1,20 @@
 /*
 Copyright 2010 Aiko Barz
 
-This file is part of masala/tumbleweed.
+This file is part of torrentkino.
 
-masala/tumbleweed is free software: you can redistribute it and/or modify
+torrentkino is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-masala/tumbleweed is distributed in the hope that it will be useful,
+torrentkino is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with masala/tumbleweed.  If not, see <http://www.gnu.org/licenses/>.
+along with torrentkino.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include <stdio.h>
@@ -29,7 +29,6 @@ along with masala/tumbleweed.  If not, see <http://www.gnu.org/licenses/>.
 #include <unistd.h>
 #include <errno.h>
 #include <pthread.h>
-#include <semaphore.h>
 #include <signal.h>
 #include <sys/epoll.h>
 #include <sys/resource.h>
@@ -39,52 +38,38 @@ along with masala/tumbleweed.  If not, see <http://www.gnu.org/licenses/>.
 #include "tumbleweed.h"
 #include "str.h"
 #include "list.h"
-#include "node_web.h"
+#include "node_tcp.h"
 #include "log.h"
 #include "conf.h"
 #include "file.h"
-#include "send_web.h"
+#include "send_tcp.h"
 #include "hash.h"
 #include "mime.h"
 #include "tcp.h"
 #include "unix.h"
 #include "http.h"
+#include "worker.h"
 
 struct obj_tcp *tcp_init( void ) {
-	struct obj_tcp *tcp = (struct obj_tcp *) myalloc( sizeof(struct obj_tcp), "tcp_init" );
+	struct obj_tcp *tcp = ( struct obj_tcp * ) myalloc( sizeof( struct obj_tcp ) );
 
 	/* Init server structure */
 	tcp->s_addrlen = sizeof( IP );
-	memset( (char *) &tcp->s_addr, '\0', tcp->s_addrlen );
+	memset( ( char * ) &tcp->s_addr, '\0', tcp->s_addrlen );
 	tcp->sockfd = -1;
-	tcp->optval = 1;
-
-	/* Worker Concurrency */
-	tcp->mutex = mutex_init();
-
-	/* Workers running */
-	tcp->id = 0;
-
-	/* Workers active */
-	tcp->active = 0;
-
-	/* Worker */
-	tcp->threads = NULL;
 
 	return tcp;
 }
 
 void tcp_free( void ) {
-	if( _main->tcp != NULL ) {
-		mutex_destroy( _main->tcp->mutex );
-		myfree( _main->tcp, "tcp_free" );
-	}
+	myfree( _main->tcp );
 }
 
 void tcp_start( void ) {
 	int listen_queue_length = SOMAXCONN * 8;
+	int optval = 1;
 
-	if( (_main->tcp->sockfd = socket( PF_INET6, SOCK_STREAM, 0)) < 0 ) {
+	if( ( _main->tcp->sockfd = socket( PF_INET6, SOCK_STREAM, 0 ) ) < 0 ) {
 		fail( "Creating socket failed." );
 	}
 	
@@ -92,65 +77,51 @@ void tcp_start( void ) {
 	_main->tcp->s_addr.sin6_port = htons( _main->conf->port );
 	_main->tcp->s_addr.sin6_addr = in6addr_any;
 	
-	if( setsockopt( _main->tcp->sockfd, SOL_SOCKET, SO_REUSEADDR, &_main->tcp->optval, sizeof(int)) == -1 ) {
+	if( setsockopt( _main->tcp->sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof( int ) ) == -1 ) {
 		fail( "Setting SO_REUSEADDR failed" );
 	}
 
-	if( _main->conf->ipv6_only == TRUE ) {
+	/* IP version */
+#if 0
 		info( NULL, 0, "IPv4 disabled" );
-		if( setsockopt( _main->tcp->sockfd, IPPROTO_IPV6, IPV6_V6ONLY, &_main->tcp->optval, sizeof(int)) == -1 ) {
+		if( setsockopt( _main->tcp->sockfd, IPPROTO_IPV6, IPV6_V6ONLY, &optval, sizeof( int ) ) == -1 ) {
 			fail( "Setting IPV6_V6ONLY failed" );
 		}
-	}
+#endif
 
-	if( bind( _main->tcp->sockfd, (struct sockaddr *) &_main->tcp->s_addr, _main->tcp->s_addrlen) ) {
+	if( bind( _main->tcp->sockfd, ( struct sockaddr * ) &_main->tcp->s_addr, _main->tcp->s_addrlen ) ) {
 		fail( "bind() to socket failed." );
 	}
 
-	if( tcp_nonblocking( _main->tcp->sockfd) < 0 ) {
-		fail( "tcp_nonblocking( _main->tcp->sockfd) failed" );
+	if( tcp_nonblocking( _main->tcp->sockfd ) < 0 ) {
+		fail( "tcp_nonblocking( _main->tcp->sockfd ) failed" );
 	}
 	
-	if( listen( _main->tcp->sockfd, listen_queue_length) ) {
+	if( listen( _main->tcp->sockfd, listen_queue_length ) ) {
 		fail( "listen() to socket failed." );
 	} else {
 		info( NULL, 0, "Listen queue length: %i", listen_queue_length );
 	}
 
-	/* Drop privileges */
-	unix_dropuid0();
-	
 	/* Setup epoll */
 	tcp_event();
-	
-	/* Create worker */
-	tcp_pool();
 }
 
 void tcp_stop( void ) {
-	int i;
-
-	/* Join threads */
-	pthread_attr_destroy( &_main->tcp->attr );
-	for( i=0; i < _main->conf->cores; i++ ) {
-		if( pthread_join( *_main->tcp->threads[i], NULL) != 0 ) {
-			fail( "pthread_join() failed" );
-		}
-		myfree( _main->tcp->threads[i], "tcp_pool" );
-	}
-	myfree( _main->tcp->threads, "tcp_pool" );
-
 	/* Shutdown socket */
-	if( shutdown( _main->tcp->sockfd, SHUT_RDWR) != 0 )
+	if( shutdown( _main->tcp->sockfd, SHUT_RDWR ) != 0 ) {
 		fail( "shutdown() failed." );
+	}
 
 	/* Close socket */
-	if( close( _main->tcp->sockfd) != 0 )
+	if( close( _main->tcp->sockfd ) != 0 ) {
 		fail( "close() failed." );
+	}
 
 	/* Close epoll */
-	if( close( _main->tcp->epollfd) != 0 )
+	if( close( _main->tcp->epollfd ) != 0 ) {
 		fail( "close() failed." );
+	}
 }
 
 void tcp_event( void ) {
@@ -161,56 +132,39 @@ void tcp_event( void ) {
 		fail( "epoll_create() failed" );
 	}
 
-	memset(&ev, '\0', sizeof( struct epoll_event ) );
+	memset( &ev, '\0', sizeof( struct epoll_event ) );
 	ev.events = EPOLLIN | EPOLLET;
 	ev.data.fd = _main->tcp->sockfd;
-	if( epoll_ctl( _main->tcp->epollfd, EPOLL_CTL_ADD, _main->tcp->sockfd, &ev) == -1 ) {
+	if( epoll_ctl( _main->tcp->epollfd, EPOLL_CTL_ADD, _main->tcp->sockfd, &ev ) == -1 ) {
 		fail( "tcp_event: epoll_ctl() failed" );
 	}
 }
 
-void tcp_pool( void ) {
-	int i;
-	
-	/* Initialize and set thread detached attribute */
-	pthread_attr_init( &_main->tcp->attr );
-	pthread_attr_setdetachstate( &_main->tcp->attr, PTHREAD_CREATE_JOINABLE );
-
-	/* Create worker threads */
-	_main->tcp->threads = (pthread_t **) myalloc( _main->conf->cores * sizeof(pthread_t *), "tcp_pool" );
-	for( i=0; i < _main->conf->cores; i++ ) {
-		_main->tcp->threads[i] = (pthread_t *) myalloc( sizeof(pthread_t), "tcp_pool" );
-		if( pthread_create( _main->tcp->threads[i], &_main->tcp->attr, tcp_thread, NULL) != 0 ) {
-			fail( "pthread_create()" );
-		}
-	}
-}
-
 void *tcp_thread( void *arg ) {
-	struct epoll_event events[TCP_MAX_EVENTS];
+	struct epoll_event events[CONF_EPOLL_MAX_EVENTS];
 	int nfds;
 	int id = 0;
 
-	mutex_block( _main->tcp->mutex );
-	id = _main->tcp->id++;
-	mutex_unblock( _main->tcp->mutex );
+	mutex_block( _main->work->mutex );
+	id = _main->work->id++;
+	mutex_unblock( _main->work->mutex );
 	
-	info( NULL, 0, "Thread[%i] - Max events: %i", id, TCP_MAX_EVENTS );
+	info( NULL, 0, "Thread[%i] - Max events: %i", id, CONF_EPOLL_MAX_EVENTS );
 
 	for( ;; ) {
-		nfds = epoll_wait( _main->tcp->epollfd, events, TCP_MAX_EVENTS, CONF_EPOLL_WAIT );
+		nfds = epoll_wait( _main->tcp->epollfd, events, CONF_EPOLL_MAX_EVENTS, CONF_EPOLL_WAIT );
 
-		if( _main->status == RUMBLE && nfds == -1 ) {
+		if( status == RUMBLE && nfds == -1 ) {
 			if( errno != EINTR ) {
 				info( NULL, 500, "epoll_wait() failed" );
 				fail( strerror( errno ) );
 			}
-		} else if( _main->status == RUMBLE && nfds == 0 ) {
+		} else if( status == RUMBLE && nfds == 0 ) {
 			/* Timeout wakeup */
 			if( id == 0 ) {
 				tcp_cron();
 			}
-		} else if( _main->status == RUMBLE && nfds > 0 ) {
+		} else if( status == RUMBLE && nfds > 0 ) {
 			tcp_worker( events, nfds, id );
 		} else {
 			/* Shutdown server */
@@ -225,9 +179,9 @@ void tcp_worker( struct epoll_event *events, int nfds, int thrd_id ) {
 	ITEM *listItem = NULL;
 	int i;
 
-	mutex_block( _main->tcp->mutex );
-	_main->tcp->active++;
-	mutex_unblock( _main->tcp->mutex );
+	mutex_block( _main->work->mutex );
+	_main->work->active++;
+	mutex_unblock( _main->work->mutex );
 
 	for( i=0; i<nfds; i++ ) {
 		if( events[i].data.fd == _main->tcp->sockfd ) {
@@ -246,15 +200,15 @@ void tcp_worker( struct epoll_event *events, int nfds, int thrd_id ) {
 		}
 	}
 
-	mutex_block( _main->tcp->mutex );
-	_main->tcp->active--;
-	mutex_unblock( _main->tcp->mutex );
+	mutex_block( _main->work->mutex );
+	_main->work->active--;
+	mutex_unblock( _main->work->mutex );
 }
 
 void tcp_gate( ITEM *listItem ) {
-	NODE *nodeItem = list_value( listItem );
+	TCP_NODE *n = list_value( listItem );
 
-	switch( nodeItem->mode ) {
+	switch( n->mode ) {
 		case NODE_MODE_SHUTDOWN:
 			node_shutdown( listItem );
 			break;
@@ -273,10 +227,10 @@ void tcp_gate( ITEM *listItem ) {
 }
 
 void tcp_rearm( ITEM *listItem, int mode ) {
-	NODE *nodeItem = list_value( listItem );
+	TCP_NODE *n = list_value( listItem );
 	struct epoll_event ev;
 
-	memset(&ev, '\0', sizeof( struct epoll_event ) );
+	memset( &ev, '\0', sizeof( struct epoll_event ) );
 
 	if( mode == TCP_INPUT ) {
 		ev.events = EPOLLET | EPOLLIN | EPOLLONESHOT;
@@ -286,7 +240,7 @@ void tcp_rearm( ITEM *listItem, int mode ) {
 	
 	ev.data.ptr = listItem;
 
-	if( epoll_ctl( _main->tcp->epollfd, EPOLL_CTL_MOD, nodeItem->connfd, &ev) == -1 ) {
+	if( epoll_ctl( _main->tcp->epollfd, EPOLL_CTL_MOD, n->connfd, &ev ) == -1 ) {
 		info( NULL, 500, strerror( errno ) );
 		fail( "tcp_rearm: epoll_ctl() failed" );
 	}
@@ -298,7 +252,7 @@ int tcp_nonblocking( int sock ) {
 		return -1;
 	}
 	opts = opts|O_NONBLOCK;
-	if( fcntl( sock,F_SETFL,opts) < 0 ) {
+	if( fcntl( sock,F_SETFL,opts ) < 0 ) {
 		return -1;
 	}
 
@@ -308,82 +262,82 @@ int tcp_nonblocking( int sock ) {
 void tcp_newconn( void ) {
 	struct epoll_event ev;
 	ITEM *listItem = NULL;
-	NODE *nodeItem = NULL;
+	TCP_NODE *n = NULL;
 	int connfd;
 	IP c_addr;
 	socklen_t c_addrlen = sizeof( IP );
 
 	for( ;; ) {
 		/* Prepare incoming connection */
-		memset( (char *) &c_addr, '\0', c_addrlen );
+		memset( ( char * ) &c_addr, '\0', c_addrlen );
 
 		/* Accept */
-		connfd = accept( _main->tcp->sockfd, (struct sockaddr *) &c_addr, &c_addrlen );
+		connfd = accept( _main->tcp->sockfd, ( struct sockaddr * ) &c_addr, &c_addrlen );
 		if( connfd < 0 ) {
 			if( errno == EAGAIN || errno == EWOULDBLOCK ) {
 				break;
 			} else {
-				fail( strerror( errno) );
+				fail( strerror( errno ) );
 			}
 		}
 
 		/* New connection: Create node object */
-		if( (listItem = node_put()) == NULL ) {
+		if( ( listItem = node_put() ) == NULL ) {
 			info( NULL, 500, "The linked list reached its limits" );
 			node_disconnect( connfd );
 			break;
 		}
 		
 		/* Store data */
-		nodeItem = list_value( listItem );
-		nodeItem->connfd = connfd;
-		memcpy( &nodeItem->c_addr, &c_addr, c_addrlen );
-		nodeItem->c_addrlen = c_addrlen;
+		n = list_value( listItem );
+		n->connfd = connfd;
+		memcpy( &n->c_addr, &c_addr, c_addrlen );
+		n->c_addrlen = c_addrlen;
 
 		/* Non blocking */
-		if( tcp_nonblocking( nodeItem->connfd) < 0 ) {
+		if( tcp_nonblocking( n->connfd ) < 0 ) {
 			fail( "tcp_nonblocking() failed" );
 		}
 
 		ev.events = EPOLLET | EPOLLIN | EPOLLONESHOT;
 		ev.data.ptr = listItem;
-		if( epoll_ctl( _main->tcp->epollfd, EPOLL_CTL_ADD, nodeItem->connfd, &ev) == -1 ) {
+		if( epoll_ctl( _main->tcp->epollfd, EPOLL_CTL_ADD, n->connfd, &ev ) == -1 ) {
 			info( NULL, 500, strerror( errno ) );
-			fail( "tcp_newconn: epoll_ctl() failed" );
+			fail( "tcp_newconn: epoll_ctl( ) failed" );
 		}
 	}
 }
 
 void tcp_output( ITEM *listItem ) {
-	NODE *nodeItem = list_value( listItem );
+	TCP_NODE *n = list_value( listItem );
 	
-	switch( nodeItem->mode ) {
+	switch( n->mode ) {
 		case NODE_MODE_SEND_INIT:
 		case NODE_MODE_SEND_MEM:
 		case NODE_MODE_SEND_FILE:
 		case NODE_MODE_SEND_STOP:
 			
-			/* Remember last activity */
-			node_activity( nodeItem );
+			/* Reset timeout counter */
+			node_activity( n );
 			
 			/* Send file */
-			send_exec( nodeItem );
+			send_tcp( n );
 			break;
 	}
 }
 
 void tcp_input( ITEM *listItem ) {
-	NODE *nodeItem = list_value( listItem );
+	TCP_NODE *n = list_value( listItem );
 	char buffer[BUF_SIZE];
 	ssize_t bytes = 0;
 	
-	while( _main->status == RUMBLE ) {
+	while( status == RUMBLE ) {
 
-		/* Remember last activity */
-		node_activity( nodeItem );
+		/* Reset timeout counter */
+		node_activity( n );
 		
 		/* Get data */
-		bytes = recv( nodeItem->connfd, buffer, BUF_OFF1, 0 );
+		bytes = recv( n->connfd, buffer, BUF_OFF1, 0 );
 
 		if( bytes < 0 ) {
 			if( errno == EAGAIN || errno == EWOULDBLOCK ) {
@@ -391,51 +345,51 @@ void tcp_input( ITEM *listItem ) {
 			} else if( errno == ECONNRESET ) {
 				/*
 				 * Very common behaviour
-				 * info( &nodeItem->c_addr, 0, "Connection reset by peer" );
+				 * info( &n->c_addr, 0, "Connection reset by peer" );
 				 */
-				node_status( nodeItem, NODE_MODE_SHUTDOWN );
+				node_status( n, NODE_MODE_SHUTDOWN );
 				return;
 			} else {
-				info( &nodeItem->c_addr, 0, "recv() failed:" );
-				info( &nodeItem->c_addr, 0, strerror( errno ) );
+				info( &n->c_addr, 0, "recv() failed:" );
+				info( &n->c_addr, 0, strerror( errno ) );
 				return;
 			}
 		} else if( bytes == 0 ) {
 			/* Regular shutdown */
-			node_status( nodeItem, NODE_MODE_SHUTDOWN );
+			node_status( n, NODE_MODE_SHUTDOWN );
 			return;
 		} else {
 			/* Read */
-			tcp_buffer( nodeItem, buffer, bytes );
+			tcp_buffer( n, buffer, bytes );
 			return;
 		}
 	}
 }
 
-void tcp_buffer( NODE *nodeItem, char *buffer, ssize_t bytes ) {
+void tcp_buffer( TCP_NODE *n, char *buffer, ssize_t bytes ) {
 	/* Append buffer */
-	node_appendBuffer( nodeItem, buffer, bytes );
+	node_appendBuffer( n, buffer, bytes );
 
-	if( nodeItem->mode != NODE_MODE_READY ) {
+	if( n->mode != NODE_MODE_READY ) {
 		fail( "FIXME tcp_buffer..." );
 	}
 
 	/* Overflow? */
-	if( nodeItem->recv_size >= BUF_OFF1 ) {
-		info( &nodeItem->c_addr, 500, "Max head buffer exceeded..." );
-		node_status( nodeItem, NODE_MODE_SHUTDOWN );
+	if( n->recv_size >= BUF_OFF1 ) {
+		info( &n->c_addr, 500, "Max head buffer exceeded..." );
+		node_status( n, NODE_MODE_SHUTDOWN );
 		return;
 	}
 
-	http_buf( nodeItem );
+	http_buf( n );
 }
 
 void tcp_cron( void ) {
-	mutex_block( _main->tcp->mutex );
+	mutex_block( _main->work->mutex );
 
 	/* Do some jobs while no worker is running */
-	if( _main->tcp->active == 0 ) {
+	if( _main->work->active == 0 ) {
 		node_cleanup();
 	}
-	mutex_unblock( _main->tcp->mutex );
+	mutex_unblock( _main->work->mutex );
 }

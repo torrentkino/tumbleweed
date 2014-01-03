@@ -1,44 +1,29 @@
 /*
 Copyright 2006 Aiko Barz
 
-This file is part of masala/tumbleweed.
+This file is part of torrentkino.
 
-masala/tumbleweed is free software: you can redistribute it and/or modify
+torrentkino is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-masala/tumbleweed is distributed in the hope that it will be useful,
+torrentkino is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with masala/tumbleweed.  If not, see <http://www.gnu.org/licenses/>.
+along with torrentkino.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <arpa/inet.h>
-#include <unistd.h>
-#include <pthread.h>
-#include <semaphore.h>
-#include <signal.h>
-#include <sys/epoll.h>
 #include <limits.h>
 
-#ifdef TUMBLEWEED
-#include "main.h"
-#include "conf.h"
-#include "str.h"
 #include "list.h"
-#else
-#include "list.h"
-#endif
 
 LIST *list_init( void ) {
-	LIST *list = (LIST *) myalloc( sizeof(LIST), "list_init" );
+	LIST *list = (LIST *) myalloc( sizeof(LIST) );
 
 	list->item = NULL;
 	list->size = 0;
@@ -55,7 +40,7 @@ void list_free( LIST *list ) {
 		list_del( list, list->item );
 	}
 
-	myfree( list, "list_free" );
+	myfree( list );
 }
 
 void list_clear( LIST *list ) {
@@ -67,7 +52,7 @@ void list_clear( LIST *list ) {
 
 	item = list_start( list );
 	while( item != NULL ) {
-		myfree( item->val, "list_clear" );
+		myfree( item->val );
 		item = list_next( item );
 	}
 }
@@ -130,7 +115,7 @@ ITEM *list_put( LIST *list, void *payload ) {
 		return NULL;
 	}
 
-	item = (ITEM *) myalloc( sizeof(ITEM), "list_put" );
+	item = (ITEM *) myalloc( sizeof(ITEM) );
 	item->val = payload;
 	item->next = NULL;
 	item->prev = NULL;
@@ -169,7 +154,7 @@ ITEM *list_ins( LIST *list, ITEM *here, void *payload ) {
 	}
 	
 	/* Payload */
-	item = (ITEM *) myalloc( sizeof(ITEM), "list_ins" );
+	item = (ITEM *) myalloc( sizeof(ITEM) );
 	item->val = payload;
 
 	/* Pointer */
@@ -206,7 +191,7 @@ ITEM *list_add( LIST *list, ITEM *here, void *payload ) {
 	}
 
 	/* Payload */
-	item = (ITEM *) myalloc( sizeof(ITEM), "list_join" );
+	item = (ITEM *) myalloc( sizeof(ITEM) );
 	item->val = payload;
 
 	/* Pointer */
@@ -246,7 +231,7 @@ ITEM *list_del( LIST *list, ITEM *item ) {
 		item->next->prev = item->prev;
 	}
 
-	myfree( item, "list_del" );
+	myfree( item );
 
 	list->size -= 1;
 

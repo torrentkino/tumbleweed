@@ -1,58 +1,36 @@
 /*
 Copyright 2009 Aiko Barz
 
-This file is part of masala/tumbleweed.
+This file is part of torrentkino.
 
-masala/tumbleweed is free software: you can redistribute it and/or modify
+torrentkino is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-masala/tumbleweed is distributed in the hope that it will be useful,
+torrentkino is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with masala/tumbleweed.  If not, see <http://www.gnu.org/licenses/>.
+along with torrentkino.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <semaphore.h>
 #include <signal.h>
-#include <pthread.h>
-#include <sys/epoll.h>
-#include <sys/sendfile.h>
-#include <errno.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
 #ifdef MAGIC
 #include <magic.h>
 #endif
 
-#include "malloc.h"
-#include "tumbleweed.h"
-#include "thrd.h"
-#include "str.h"
-#include "conf.h"
-#include "list.h"
-#include "node_web.h"
-#include "log.h"
-#include "hash.h"
-#include "file.h"
 #include "mime.h"
 
-struct obj_mime *mime_init( void ) {
-	struct obj_mime *mime = (struct obj_mime *) myalloc( sizeof(struct obj_mime), "mime_init" );
+struct obj_mdb *mime_init( void ) {
+	struct obj_mdb *mime = (struct obj_mdb *) myalloc( sizeof(struct obj_mdb) );
 	mime->list = list_init();
 	mime->hash = NULL;
-	mime->mutex = thrd_init( "/mime" );
+	mime->mutex = mutex_init();
 	return mime;
 }
 
@@ -60,12 +38,12 @@ void mime_free( void ) {
 	list_clear( _main->mime->list );
 	list_free( _main->mime->list );
 	hash_free( _main->mime->hash );
-	thrd_destroy( _main->mime->mutex );
-	myfree( _main->mime, "mime_free" );
+	mutex_destroy( _main->mime->mutex );
+	myfree( _main->mime );
 }
 
-struct obj_mimeItem *mime_add( const char *key, const char *value ) {
-	struct obj_mimeItem *tuple = (struct obj_mimeItem *) myalloc( sizeof(struct obj_mimeItem), "mime_add" );
+struct obj_mime *mime_add( const char *key, const char *value ) {
+	struct obj_mime *tuple = (struct obj_mime *) myalloc( sizeof(struct obj_mime) );
 
 	strncpy( tuple->key, key, MIME_KEYLEN );
 	strncpy( tuple->val, value, MIME_VALLEN );
@@ -126,14 +104,14 @@ void mime_load( void ) {
 
 void mime_hash( void ) {
 	ITEM *item = NULL;
-	struct obj_mimeItem *tuple = NULL;
+	struct obj_mime *tuple = NULL;
 	
 	if( list_size( _main->mime->list ) < 1 ) {
 		return;
 	}
 
 	/* Create hash */
-	_main->mime->hash = hash_init( list_size( _main->mime->list ) * 10 );
+	_main->mime->hash = hash_init( list_size( _main->mime->list ) + 10 );
 
 	/* Hash list */
 	item = list_start( _main->mime->list );
@@ -178,7 +156,7 @@ const char *mime_find( char *filename ) {
 
 #ifdef MAGIC
 void mime_magic( char *filename, char *key ) {
-	struct obj_mimeItem *tuple = NULL;
+	struct obj_mime *tuple = NULL;
 	magic_t magic = NULL;
 	const char *mime = NULL;
 
@@ -201,9 +179,9 @@ void mime_magic( char *filename, char *key ) {
 	}
 	
 	/* Cache mime type in memory */
-	thrd_block( _main->mime->mutex );
+	mutex_block( _main->mime->mutex );
 	tuple = mime_add( key, mime );
-	thrd_unblock( _main->mime->mutex );
+	mutex_unblock( _main->mime->mutex );
 	
 	/* Clear handle */
 	magic_close( magic );
@@ -229,7 +207,7 @@ char *mime_extension( char *filename ) {
 	}
 
 	/* bla.7z.001, bla.7z.002 */
-	if( str_isNumber( key) ) {
+	if( str_isNumber( key ) ) {
 		/* Cut number */
 		key--;
 		*key = '\0';

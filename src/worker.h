@@ -1,5 +1,5 @@
 /*
-Copyright 2006 Aiko Barz
+Copyright 2011 Aiko Barz
 
 This file is part of torrentkino.
 
@@ -17,15 +17,33 @@ You should have received a copy of the GNU General Public License
 along with torrentkino.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef FAIL_H
-#define FAIL_H
+#ifndef WORK_H
+#define WORK_H
 
-#include "main.h"
+#include "malloc.h"
+#include "thrd.h"
+#include "log.h"
 
-#ifdef NSS
-#define fail _nss_tk_fail
+struct obj_work {
+	int number_of_threads;
+	int active;
+	int id;
+
+	/* Global lock */
+	pthread_t **threads;
+	pthread_attr_t attr;
+	pthread_mutex_t *mutex;
+
+#ifdef TUMBLEWEED
+	/* TCP nodes */
+	pthread_mutex_t *tcp_node;
 #endif
+};
 
-void fail( const char *format, ... );
+struct obj_work *work_init( void );
+void work_free( void );
+
+void work_start( void );
+void work_stop( void );
 
 #endif

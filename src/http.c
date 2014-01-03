@@ -1,27 +1,26 @@
 /*
 Copyright 2010 Aiko Barz
 
-This file is part of masala/tumbleweed.
+This file is part of torrentkino.
 
-masala/tumbleweed is free software: you can redistribute it and/or modify
+torrentkino is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-masala/tumbleweed is distributed in the hope that it will be useful,
+torrentkino is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with masala/tumbleweed.  If not, see <http://www.gnu.org/licenses/>.
+along with torrentkino.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <semaphore.h>
 #include <pthread.h>
 #include <signal.h>
 #include <netinet/in.h>
@@ -36,12 +35,12 @@ along with masala/tumbleweed.  If not, see <http://www.gnu.org/licenses/>.
 #include "hash.h"
 #include "list.h"
 #include "thrd.h"
-#include "node_web.h"
+#include "node_tcp.h"
 #include "log.h"
 #include "file.h"
 #include "mime.h"
 #include "http.h"
-#include "send_web.h"
+#include "send_tcp.h"
 
 long int http_urlDecode( char *src, long int srclen, char *dst, long int dstlen ) {
 	int i = 0, j = 0;
@@ -156,7 +155,7 @@ void http_deleteHeader( HASH *head ) {
 	hash_free( head );
 }
 
-void http_buf( NODE *nodeItem ) {
+void http_buf( TCP_NODE *n ) {
 	char *p_cmd = NULL;
 	char *p_url = NULL;
 	char *p_var = NULL;
@@ -167,13 +166,13 @@ void http_buf( NODE *nodeItem ) {
 	char recv_buf[BUF_SIZE];
 
 	/* Do not start before at least this much arrived: "GET / HTTP/1.1" */
-	if( nodeItem->recv_size <= 14 ) {
+	if( n->recv_size <= 14 ) {
 		return;
 	}
 
 	/* Copy HTTP request */
 	memset( recv_buf, '\0', BUF_SIZE );
-	memcpy( recv_buf, nodeItem->recv_buf, nodeItem->recv_size );
+	memcpy( recv_buf, n->recv_buf, n->recv_size );
 
 	/* Return until the header is complete. Gets killed if this grows beyond all imaginations. */
 	if( (p_body = strstr( recv_buf, "\r\n\r\n")) == NULL ) {
@@ -187,13 +186,13 @@ void http_buf( NODE *nodeItem ) {
 	*p_body = '\0'; p_body++;
 
 	/* HTTP Pipelining: There is at least one more request. */
-	if( nodeItem->recv_size > (ssize_t)(p_body-recv_buf) ) {
-		nodeItem->recv_size -= (ssize_t)(p_body-recv_buf );
-		memset( nodeItem->recv_buf, '\0', BUF_SIZE );
-		memcpy( nodeItem->recv_buf, p_body, nodeItem->recv_size );
+	if( n->recv_size > (ssize_t)(p_body-recv_buf) ) {
+		n->recv_size -= (ssize_t)(p_body-recv_buf );
+		memset( n->recv_buf, '\0', BUF_SIZE );
+		memcpy( n->recv_buf, p_body, n->recv_size );
 	} else {
 		/* The request has been copied. Reset the receive buffer. */
-		node_clearRecvBuf( nodeItem );
+		node_clearRecvBuf( n );
 	}
 
 	/* Remember start point */
@@ -201,16 +200,16 @@ void http_buf( NODE *nodeItem ) {
 
 	/* Find url */
 	if( (p_url = strchr( p_cmd, ' ')) == NULL ) {
-		info( &nodeItem->c_addr, 400, "Requested URL was not found" );
-		node_status( nodeItem, NODE_MODE_SHUTDOWN );
+		info( &n->c_addr, 400, "Requested URL was not found" );
+		node_status( n, NODE_MODE_SHUTDOWN );
 		return;
 	}
 	*p_url = '\0'; p_url++;
 
 	/* Find protocol type */
 	if( (p_proto = strchr( p_url, ' ')) == NULL ) {
-		info( &nodeItem->c_addr, 400, "No protocol found in request" );
-		node_status( nodeItem, NODE_MODE_SHUTDOWN );
+		info( &n->c_addr, 400, "No protocol found in request" );
+		node_status( n, NODE_MODE_SHUTDOWN );
 		return;
 	}
 	*p_proto = '\0'; p_proto++;
@@ -222,8 +221,8 @@ void http_buf( NODE *nodeItem ) {
 
 	/* Find header lines */
 	if( (p_head = strstr( p_proto, "\r\n")) == NULL ) {
-		info( &nodeItem->c_addr, 400, "Impossible. There must be a \\r\\n. I put it there..." );
-		node_status( nodeItem, NODE_MODE_SHUTDOWN );
+		info( &n->c_addr, 400, "Impossible. There must be a \\r\\n. I put it there..." );
+		node_status( n, NODE_MODE_SHUTDOWN );
 		return;
 	}
 	*p_head = '\0'; p_head++;
@@ -233,198 +232,212 @@ void http_buf( NODE *nodeItem ) {
 	head = http_hashHeader( p_head );
 	
 	/* Validate input */
-	http_read( nodeItem, p_cmd, p_url, p_proto, head );
+	http_read( n, p_cmd, p_url, p_proto, head );
 	
 	/* Delete Hash */
 	http_deleteHeader( head );
 }
 
-void http_read( NODE *nodeItem, char *p_cmd, char *p_url, char *p_proto, HASH *p_head ) {
+void http_read( TCP_NODE *n, char *p_cmd, char *p_url, char *p_proto, HASH *p_head ) {
 	/* Check header */
-	if( !http_check( nodeItem, p_cmd, p_url, p_proto) ) {
+	if( !http_check( n, p_cmd, p_url, p_proto) ) {
 		return;
 	}
 
-	/* Guess HTTP reply code: 200 or 404 */
-	http_code( nodeItem );
+	/* Guess HTTP reply code. */
+	/* 200, 404 */
+	http_code( n );
 
-	/* Add Keep-Alive if necessary */
-	http_keepalive( nodeItem, p_head );
+	/* Add Keep-Alive if necessary. */
+	http_keepalive( n, p_head );
 
-	/* Add Last-Modified. The reply code may change to 304 */
-	http_lastmodified( nodeItem, p_head );
+	/* Add Last-Modified. */
+	/* 200, 404, 304 */
+	http_lastmodified( n, p_head );
 
-	/* HTTP Reply Size */
-	http_size( nodeItem, p_head );
+	/* HTTP Reply Size. */
+	/* 200, 404, 304, 206, 416 */
+	http_size( n, p_head );
 
-	/* Prepare reply according to the HTTP code */
-	http_gate( nodeItem, p_head );
+	/* Prepare reply according to the HTTP code. */
+	http_gate( n, p_head );
 
 	/* Send reply */
-	http_send( nodeItem );
+	http_send( n );
 }
 
-int http_check( NODE *nodeItem, char *p_cmd, char *p_url, char *p_proto ) {
+int http_check( TCP_NODE *n, char *p_cmd, char *p_url, char *p_proto ) {
 
 	/* Command */
 	if( strncmp( p_cmd, "GET", 3) == 0 ) {
-		nodeItem->type = HTTP_GET;
+		n->type = HTTP_GET;
 	} else if( strncmp( p_cmd, "HEAD", 4) == 0 ) {
-		nodeItem->type = HTTP_HEAD;
+		n->type = HTTP_HEAD;
 	} else {
-		info( &nodeItem->c_addr, 400, "Invalid request type: %s", p_cmd );
-		node_status( nodeItem, NODE_MODE_SHUTDOWN );
+		info( &n->c_addr, 400, "Invalid request type: %s", p_cmd );
+		node_status( n, NODE_MODE_SHUTDOWN );
 		return 0;
 	}
 
 	/* Protocol */
 	if( strncmp( p_proto, "HTTP/1.1", 8) != 0 && strncmp( p_proto, "HTTP/1.0", 8) != 0 ) {
-		info( &nodeItem->c_addr, 400, "Invalid protocol: %s", p_proto );
-		node_status( nodeItem, NODE_MODE_SHUTDOWN );
+		info( &n->c_addr, 400, "Invalid protocol: %s", p_proto );
+		node_status( n, NODE_MODE_SHUTDOWN );
 		return 0;
 	}
 	if( strncmp( p_proto, "HTTP/1.1", 8) == 0 ) {
-		nodeItem->proto = HTTP_1_1;
+		n->proto = HTTP_1_1;
 	} else {
-		nodeItem->proto = HTTP_1_0;
+		n->proto = HTTP_1_0;
 	}
 
 	/* URL */
-	if( !http_urlDecode( p_url, strlen( p_url), nodeItem->entity_url, BUF_SIZE) ) {
-		info( &nodeItem->c_addr, 400, "Decoding URL failed" );
-		node_status( nodeItem, NODE_MODE_SHUTDOWN );
+	if( !http_urlDecode( p_url, strlen( p_url), n->entity_url, BUF_SIZE) ) {
+		info( &n->c_addr, 400, "Decoding URL failed" );
+		node_status( n, NODE_MODE_SHUTDOWN );
 		return 0;
 	}
 
 	/* Minimum path requirement */
-	if( nodeItem->entity_url[0] != '/' ) {
-		info( &nodeItem->c_addr, 400, "URL must start with '/': %s",
-			nodeItem->entity_url );
-		node_status( nodeItem, NODE_MODE_SHUTDOWN );
+	if( n->entity_url[0] != '/' ) {
+		info( &n->c_addr, 400, "URL must start with '/': %s",
+			n->entity_url );
+		node_status( n, NODE_MODE_SHUTDOWN );
 		return 0;
 	}
 
 	/* ".." in path. Do not like. */
-	if( strstr( nodeItem->entity_url, "../") != NULL ) {
-		info( &nodeItem->c_addr, 400, "Double dots: %s",
-			nodeItem->entity_url );
-		node_status( nodeItem, NODE_MODE_SHUTDOWN );
+	if( strstr( n->entity_url, "../") != NULL ) {
+		info( &n->c_addr, 400, "Double dots: %s",
+			n->entity_url );
+		node_status( n, NODE_MODE_SHUTDOWN );
 		return 0;
 	}
  
 	/* URL */
-	if( ! str_isValidUTF8( nodeItem->entity_url) ) {
-		info( &nodeItem->c_addr, 400, "Invalid UTF8 in URL" );
-		node_status( nodeItem, NODE_MODE_SHUTDOWN );
+	if( ! str_isValidUTF8( n->entity_url) ) {
+		info( &n->c_addr, 400, "Invalid UTF8 in URL" );
+		node_status( n, NODE_MODE_SHUTDOWN );
 		return 0;
 	}
 
 	return 1;
 }
 
-void http_code( NODE *nodeItem ) {
-	snprintf( nodeItem->filename, BUF_SIZE, "%s%s", _main->conf->home, nodeItem->entity_url );
+void http_code( TCP_NODE *n ) {
+	snprintf( n->filename, BUF_SIZE, "%s%s", _main->conf->home, n->entity_url );
 
-	if( file_isreg( nodeItem->filename) ) {
+	if( file_isreg( n->filename ) ) {
 		
 		/* The requested entity is a file */
-		nodeItem->code = 200;
+		n->code = 200;
 	
-	} else if( file_isdir( nodeItem->filename) ) {
+	} else if( file_isdir( n->filename ) ) {
 
 		/* There is a index.html file within that directory? */
-		snprintf( nodeItem->filename, BUF_SIZE, "%s%s/%s", _main->conf->home, nodeItem->entity_url, _main->conf->index_name );
+		snprintf( n->filename, BUF_SIZE, "%s%s/%s",
+				_main->conf->home, n->entity_url, _main->conf->file );
 		
-		if( file_isreg( nodeItem->filename) ) {
-			nodeItem->code = 200;
+		if( file_isreg( n->filename ) ) {
+			n->code = 200;
 		} else {
-			nodeItem->code = 404;
+			n->code = 404;
 		}
 	
 	} else {
 
-		nodeItem->code = 404;
+		n->code = 404;
 	}
 }
 
-void http_keepalive( NODE *nodeItem, HASH *head ) {
-	memset( nodeItem->keepalive, '\0', BUF_SIZE );
+void http_keepalive( TCP_NODE *n, HASH *head ) {
 
-	if( hash_exists( head, (UCHAR *)"Connection",  10) ) {
-		if( strcasecmp( (char *)hash_get( head, (UCHAR *)"Connection", 10), "Keep-Alive") == 0 ) {
-			snprintf( nodeItem->keepalive, BUF_SIZE, "Connection: %s\r\n",
-				(char *)hash_get( head, (UCHAR *)"Connection", 10) );
-		}
-	}
-}
-
-void http_lastmodified( NODE *nodeItem, HASH *head ) {
-	char entity_time[BUF_SIZE];
-
-	if( nodeItem->code != 200 || !file_isreg( nodeItem->filename) ) {
+	if( ! hash_exists( head, (UCHAR *)"Connection",  10 ) ) {
 		return;
 	}
 
-	str_gmttime( entity_time, BUF_SIZE, file_mod( nodeItem->filename) );
+	if( strcasecmp( (char *)hash_get( head, (UCHAR *)"Connection", 10),	"Keep-Alive") != 0 ) {
+		return;
+	}
 
-	snprintf( nodeItem->lastmodified, BUF_SIZE, "Last-Modified: %s\r\n", entity_time );
+	n->keepalive = TRUE;
+}
 
-	if( hash_exists( head, (UCHAR *)"If-Modified-Since",  17) ) {
-		if( strcmp( entity_time, (char *)hash_get( head, (UCHAR *)"If-Modified-Since", 17)) == 0 ) {
-			nodeItem->code = 304;
+void http_lastmodified( TCP_NODE *n, HASH *head ) {
+	if( n->code == 404 ) {
+		return;
+	}
+
+	str_gmttime( n->lastmodified, DATE_SIZE, file_mod( n->filename ) );
+
+	if( hash_exists( head, (UCHAR *)"If-Modified-Since", 17 ) ) {
+		if( strcmp( n->lastmodified, (char *)hash_get( head, (UCHAR *)"If-Modified-Since", 17 ) ) == 0 ) {
+			n->code = 304;
 		}
 	}
 }
 
-void http_gate( NODE *nodeItem, HASH *head ) {
+void http_gate( TCP_NODE *n, HASH *head ) {
 	/* Compute full reply */
-	switch( nodeItem->code ) {
+	switch( n->code ) {
 		case 200:
-			http_200( nodeItem );
-			info( &nodeItem->c_addr, nodeItem->code, nodeItem->entity_url );
+			http_200( n );
+			info( &n->c_addr, n->code, n->entity_url );
 			break;
+#ifdef RANGE
 		case 206:
-			http_206( nodeItem );
-			info( &nodeItem->c_addr, nodeItem->code,
-				"%s [%s]", nodeItem->entity_url,
-				(char *)hash_get(head, (UCHAR *)"Range", 5));
+			http_206( n );
+			info( &n->c_addr, n->code,
+				"%s [%s]", n->entity_url,
+				(char *)hash_get(head, (UCHAR *)"Range", 5 ) );
 			break;
+		case 416:
+			http_416( n );
+			info( &n->c_addr, n->code,
+				"%s [%s]", n->entity_url,
+				(char *)hash_get(head, (UCHAR *)"Range", 5 ) );
+			break;
+#endif
 		case 304:
-			http_304( nodeItem );
-			info( &nodeItem->c_addr, nodeItem->code, nodeItem->entity_url );
+			http_304( n );
+			info( &n->c_addr, n->code, n->entity_url );
 			break;
 		case 404:
-			http_404( nodeItem );
-			info( &nodeItem->c_addr, nodeItem->code, nodeItem->entity_url );
+			http_404( n );
+			info( &n->c_addr, n->code, n->entity_url );
 			break;
 	}
 }
 
-void http_send( NODE *nodeItem ) {
+void http_send( TCP_NODE *n ) {
 	/* Compute header size */
-	nodeItem->send_size = strlen( nodeItem->send_buf );
+	n->send_size = strlen( n->send_buf );
 
 	/* Prepare event system for sending data */
-	node_status( nodeItem, NODE_MODE_SEND_INIT );
+	node_status( n, NODE_MODE_SEND_INIT );
 
 	/* Start sending */
-	send_exec( nodeItem );
+	send_tcp( n );
 }
 
-void http_size( NODE *nodeItem, HASH *head ) {
+void http_size( TCP_NODE *n, HASH *head ) {
+#ifdef RANGE
 	char *p_start = NULL;
 	char *p_stop = NULL;
 	char range[BUF_SIZE];
+#endif
 
  	/* Not a valid file */
-	if ((nodeItem->code != 200 && nodeItem->code != 304) || !file_isreg(nodeItem->filename)) {
+	if ( n->code == 404 ) {
  		return;
  	}
- 
+
  	/* Normal case: content_length == filesize == f_stop */
-	nodeItem->filesize = file_size(nodeItem->filename);
-	nodeItem->f_stop = nodeItem->filesize;
-	nodeItem->content_length = nodeItem->filesize;
+	n->filesize = file_size(n->filename);
+
+#ifdef RANGE
+	n->f_stop = n->filesize;
+	n->content_length = n->filesize;
 
 	/* No Range header found: Nothing to do */
 	if ( !hash_exists(head, (UCHAR *)"Range", 5) ) {
@@ -436,61 +449,56 @@ void http_size( NODE *nodeItem, HASH *head ) {
 	p_start = range;
 
 	if ( strncmp(p_start, "bytes=", 6) != 0 ) {
-		info( &nodeItem->c_addr, 206, "Broken Range[1]: %s", 
-			(char *)hash_get(head, (UCHAR *)"Range", 5));
+		n->code = 416;
 		return;
 	}
 	p_start += 6;
 
 	if ( (p_stop = strchr(p_start, '-')) == NULL ) {
-		info( &nodeItem->c_addr, 206, "Broken Range[2]: %s",
-			(char *)hash_get(head, (UCHAR *)"Range", 5));
+		n->code = 416;
 		return;
 	}
 	*p_stop = '\0'; p_stop++;
 
 	if ( *p_start == '\0' ) {
-		nodeItem->range_start = 0;
+		n->range_start = 0;
 	} else if ( str_isNumber(p_start) ) {
-		nodeItem->range_start = atol(p_start);
+		n->range_start = atol(p_start);
 	} else {
-		info( &nodeItem->c_addr, 206, "Broken Range[3]: %s",
-			(char *)hash_get(head, (UCHAR *)"Range", 5));
+		n->code = 416;
 		return;
 	}
 
 	if ( *p_stop == '\0' ) {
-		nodeItem->range_stop = nodeItem->filesize-1;
+		n->range_stop = n->filesize-1;
 	} else if ( str_isNumber(p_stop) ) {
-		nodeItem->range_stop = atol(p_stop);
+		n->range_stop = atol(p_stop);
 	} else {
-		info( &nodeItem->c_addr, 206,
-			"Broken Range[4]: %s", (char *)hash_get(head, (UCHAR *)"Range", 5));
+		n->code = 416;
 		return;
 	}
 	
-	if ( nodeItem->range_start < 0 || nodeItem->range_start >= nodeItem->filesize ) {
-		info( &nodeItem->c_addr, 206,
-			"Broken Range[5]: %s", (char *)hash_get(head, (UCHAR *)"Range", 5));
+	if ( n->range_start < 0 || n->range_start >= n->filesize ) {
+		n->code = 416;
 		return;
 	}
 	
-	if ( nodeItem->range_stop < nodeItem->range_start || nodeItem->range_stop >= nodeItem->filesize ) {
-	   	info( &nodeItem->c_addr, 206,
-			"Broken Range[7]: %s", (char *)hash_get(head, (UCHAR *)"Range", 5));
+	if ( n->range_stop < n->range_start || n->range_stop >= n->filesize ) {
+		n->code = 416;
 	   	return;
 	}
 
-	nodeItem->f_offset = nodeItem->range_start;
-	nodeItem->f_stop = nodeItem->range_stop + 1;
-	nodeItem->content_length = nodeItem->range_stop - nodeItem->f_offset + 1;
+	n->f_offset = n->range_start;
+	n->f_stop = n->range_stop + 1;
+	n->content_length = n->range_stop - n->f_offset + 1;
 
 	/* Success */
-	nodeItem->code = 206;
+	n->code = 206;
+#endif
 }
 
-void http_404( NODE *nodeItem ) {
-	char datebuf[BUF_SIZE];
+void http_404( TCP_NODE *n ) {
+	char datebuf[DATE_SIZE];
 	char buffer[BUF_SIZE] = 
 	"<!DOCTYPE html>"
 	"<html lang=\"en\" xml:lang=\"en\">"
@@ -503,17 +511,18 @@ void http_404( NODE *nodeItem ) {
 	"</body>"
 	"</html>";
 	int size = strlen( buffer );
-	char protocol[9] = "HTTP/1.1";
-	
-	if( nodeItem->proto == HTTP_1_0 ) {
-		strncpy( protocol, "HTTP/1.0", 8 );
-	}
-	
-	/* Compute GMT time */
-	str_GMTtime( datebuf, BUF_SIZE );
+	char protocol = ( n->proto == HTTP_1_1 ) ? '1' : '0';
+	char keepalive[] = "Connection: keep-alive\r\n";
 
-	snprintf( nodeItem->send_buf, BUF_SIZE,
-	"%s 404 Not found\r\n"
+	if( n->keepalive == FALSE ) {
+		keepalive[0] = '\0';
+	}
+
+	/* Compute GMT time */
+	str_GMTtime( datebuf, DATE_SIZE );
+
+	snprintf( n->send_buf, BUF_SIZE,
+	"HTTP/1.%c 404 Not found\r\n"
 	"Date: %s\r\n"
 	"Server: %s\r\n"
 	"Content-Length: %i\r\n"
@@ -521,96 +530,139 @@ void http_404( NODE *nodeItem ) {
 	"%s"
 	"\r\n"
 	"%s",
-	protocol, datebuf, CONF_SRVNAME, size, nodeItem->keepalive, buffer );
+	protocol, datebuf, CONF_SRVNAME, size, keepalive, buffer );
 }
 
-void http_304( NODE *nodeItem ) {
-	char datebuf[BUF_SIZE];
-	char protocol[9] = "HTTP/1.1";
-	
-	if( nodeItem->proto == HTTP_1_0 ) {
-		strncpy( protocol, "HTTP/1.0", 8 );
+void http_304( TCP_NODE *n ) {
+	char datebuf[DATE_SIZE];
+	char protocol = ( n->proto == HTTP_1_1 ) ? '1' : '0';
+	char keepalive[] = "Connection: keep-alive\r\n";
+
+	if( n->keepalive == FALSE ) {
+		keepalive[0] = '\0';
 	}
 	
 	/* Compute GMT time */
-	str_GMTtime( datebuf, BUF_SIZE );
+	str_GMTtime( datebuf, DATE_SIZE );
 
-	snprintf( nodeItem->send_buf, BUF_SIZE,
-	"%s 304 Not Modified\r\n"
+	snprintf( n->send_buf, BUF_SIZE,
+	"HTTP/1.%c 304 Not Modified\r\n"
 	"Date: %s\r\n"
 	"Server: %s\r\n"
 	"%s"
 	"\r\n",
-	protocol, datebuf, CONF_SRVNAME, nodeItem->keepalive );
+	protocol, datebuf, CONF_SRVNAME, keepalive );
 }
 
-void http_200( NODE *nodeItem ) {
-	char datebuf[BUF_SIZE];
+void http_200( TCP_NODE *n ) {
+	char datebuf[DATE_SIZE];
 	const char *mimetype = NULL;
-	char protocol[9] = "HTTP/1.1";
-	
-	if( nodeItem->proto == HTTP_1_0 ) {
-		strncpy( protocol, "HTTP/1.0", 8 );
+	char protocol = ( n->proto == HTTP_1_1 ) ? '1' : '0';
+	char keepalive[] = "Connection: keep-alive\r\n";
+
+	if( n->keepalive == FALSE ) {
+		keepalive[0] = '\0';
 	}
 	
 	/* Compute GMT time */
-	str_GMTtime( datebuf, BUF_SIZE );
+	str_GMTtime( datebuf, DATE_SIZE );
 
 	/* Compute mime type */
-	mimetype = mime_find( nodeItem->filename );
+	mimetype = mime_find( n->filename );
 
 	/* Compute answer */
-	snprintf( nodeItem->send_buf, BUF_SIZE,
-	"%s 200 OK\r\n"
+	snprintf( n->send_buf, BUF_SIZE,
+	"HTTP/1.%c 200 OK\r\n"
 	"Date: %s\r\n"
 	"Server: %s\r\n"
-#ifdef __i386__
-	"Content-Length: %u\r\n"
-#else
+#ifdef __amd64__
 	"Content-Length: %lu\r\n"
+#else /* __i386__ __arm__ */
+	"Content-Length: %u\r\n"
 #endif
 	"Content-Type: %s\r\n"
-	"%s"
+	"Last-Modified: %s\r\n"
 	"%s"
 	"\r\n",
-	protocol, datebuf, CONF_SRVNAME, nodeItem->content_length, mimetype, nodeItem->lastmodified, nodeItem->keepalive );
+	protocol, datebuf, CONF_SRVNAME, n->filesize, mimetype, n->lastmodified, keepalive );
 }
 
-void http_206( NODE *nodeItem ) {
-	char datebuf[BUF_SIZE];
+#ifdef RANGE
+void http_206( TCP_NODE *n ) {
+	char datebuf[DATE_SIZE];
 	const char *mimetype = NULL;
-	char protocol[9] = "HTTP/1.1";
-	
-	if (nodeItem->proto == HTTP_1_0) {
-		strncpy(protocol, "HTTP/1.0", 8);
+	char protocol = ( n->proto == HTTP_1_1 ) ? '1' : '0';
+	char keepalive[] = "Connection: keep-alive\r\n";
+
+	if( n->keepalive == FALSE ) {
+		keepalive[0] = '\0';
 	}
 
-	str_GMTtime(datebuf, BUF_SIZE);
-	mimetype = mime_find(nodeItem->filename);
+	str_GMTtime(datebuf, DATE_SIZE);
+	mimetype = mime_find(n->filename);
 
-	snprintf(nodeItem->send_buf, BUF_SIZE,
-	"%s 206 OK\r\n"
+	snprintf(n->send_buf, BUF_SIZE,
+	"HTTP/1.%c 206 OK\r\n"
 	"Date: %s\r\n"
 	"Server: %s\r\n"
-#ifdef __i386__
-	"Content-Length: %u\r\n"
-	"Content-Range: bytes %u-%u/%u\r\n"
-#else
+#ifdef __amd64__
 	"Content-Length: %lu\r\n"
 	"Content-Range: bytes %lu-%lu/%lu\r\n" 
+#else /* __i386__ __arm__ */
+	"Content-Length: %u\r\n"
+	"Content-Range: bytes %u-%u/%u\r\n"
 #endif
 	"Content-Type: %s\r\n"
 	"Accept-Ranges: bytes\r\n"
-	"%s"
+	"Last-Modified: %s\r\n"
 	"%s"
 	"\r\n",
 	protocol, datebuf, CONF_SRVNAME,
-#ifdef __i386__
-	nodeItem->content_length,
-	(unsigned int)nodeItem->range_start, (unsigned int)nodeItem->range_stop, nodeItem->filesize,
-#else
-	nodeItem->content_length,
-	nodeItem->range_start, nodeItem->range_stop, nodeItem->filesize,
+#ifdef __amd64__
+	n->content_length,
+	n->range_start, n->range_stop, n->filesize,
+#else /* __i386__ __arm__ */
+	n->content_length,
+	(unsigned int)n->range_start, (unsigned int)n->range_stop, n->filesize,
 #endif
-	mimetype, nodeItem->lastmodified, nodeItem->keepalive);
+	mimetype, n->lastmodified, keepalive);
 }
+
+void http_416( TCP_NODE *n ) {
+	char datebuf[DATE_SIZE];
+	char buffer[BUF_SIZE] = 
+	"<!DOCTYPE html>"
+	"<html lang=\"en\" xml:lang=\"en\">"
+	"<head>"
+	"<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />"
+	"<title>Broken range</title>"
+	"</head>"
+	"<body>"
+	"<h1>Broken range</h1>"
+	"</body>"
+	"</html>";
+	int size = strlen( buffer );
+	char protocol = ( n->proto == HTTP_1_1 ) ? '1' : '0';
+	char keepalive[] = "Connection: keep-alive\r\n";
+
+	if( n->keepalive == FALSE ) {
+		keepalive[0] = '\0';
+	}
+
+	/* Compute GMT time */
+	str_GMTtime( datebuf, DATE_SIZE );
+
+	snprintf( n->send_buf, BUF_SIZE,
+	"HTTP/1.%c 416 Requested Range Not Satisfiable\r\n"
+	"Date: %s\r\n"
+	"Server: %s\r\n"
+	"Content-Length: %i\r\n"
+	"Content-Type: text/html; charset=utf-8\r\n"
+	"%s"
+	"\r\n"
+	"%s",
+	protocol, datebuf, CONF_SRVNAME, size, keepalive, buffer );
+}
+
+
+#endif

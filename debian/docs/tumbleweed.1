@@ -1,21 +1,21 @@
 .\" generated with Ronn/v0.7.3
 .\" http://github.com/rtomayko/ronn/tree/0.7.3
 .
-.TH "TUMBLEWEED" "1" "August 2013" "" ""
+.TH "TUMBLEWEED" "1" "January 2014" "" ""
 .
 .SH "NAME"
 \fBtumbleweed\fR \- Instant webserver
 .
 .SH "SYNOPSIS"
-\fBtumbleweed\fR [\-d] [\-q] [\-6] [\-s directory] [\-p port] [\-i index] [\-u username]
+\fBtumbleweed\fR [\-d] [\-q] [\-6] [\-w workdir] [\-p port] [\-i index]
 .
 .SH "DESCRIPTION"
-\fBtumbleweed\fR is a simple webserver for static content with a low memory footprint for the Linux OS\. It uses the Linux EPOLL event system, does non\-blocking IO, supports Zero\-Copy and uses all the cores you have\. It is actually quite fast\. Though only a few HTTP features are supported such as HTTP Pipelining, Keep\-alive and Range Requests as seen in the wild\.
+\fBtumbleweed\fR is a simple webserver for static content with a low memory footprint for the Linux OS\. It uses the Linux EPOLL event system, does non\-blocking IO, supports Zero\-Copy and uses all the cores you have\. It is actually really fast\. It has only a limited HTTP feature set though\.
 .
 .SH "OPTIONS"
 .
 .TP
-\fB\-s\fR \fIdirectory\fR
+\fB\-w\fR \fIworkdir\fR
 Share this directory\. (Default: ~/Public)
 .
 .TP
@@ -25,10 +25,6 @@ Listen to this port\. (Default: TCP/8080)
 .TP
 \fB\-i\fR \fIindex\fR
 Serve this file if the requested entity is a directory\. (Default: index\.html)
-.
-.TP
-\fB\-u\fR \fIusername\fR
-When starting as root, use \-u to change the UID\.
 .
 .TP
 \fB\-d\fR
@@ -42,25 +38,6 @@ Be quiet and do not log anything\.
 \fB\-6\fR
 IPv6 only\.
 .
-.SH "INSTALLATION"
-.
-.IP "\(bu" 4
-apt\-get install build\-essential
-.
-.IP "\(bu" 4
-apt\-get install debhelper
-.
-.IP "\(bu" 4
-apt\-get install git\-buildpackage
-.
-.IP "\(bu" 4
-apt\-get install libmagic\-dev
-.
-.IP "\(bu" 4
-git\-buildpackage
-.
-.IP "" 0
-.
 .SH "EXAMPLES"
 Serve \fI~/Public\fR at port \fI8080\fR:
 .
@@ -69,6 +46,34 @@ Serve \fI~/Public\fR at port \fI8080\fR:
 .nf
 
 $ tumbleweed
+.
+.fi
+.
+.IP "" 0
+.
+.SH "INSTALLATION"
+There is a simple installation helper for Debian/Ubuntu\. Just run one of the following commands to create a installable package\.
+.
+.IP "" 4
+.
+.nf
+
+$ make debian
+$ make ubuntu
+.
+.fi
+.
+.IP "" 0
+.
+.P
+Otherwise, you may use
+.
+.IP "" 4
+.
+.nf
+
+$ make
+$ sudo make install
 .
 .fi
 .

@@ -1,35 +1,35 @@
 /*
 Copyright 2006 Aiko Barz
 
-This file is part of masala/tumbleweed.
+This file is part of torrentkino.
 
-masala/tumbleweed is free software: you can redistribute it and/or modify
+torrentkino is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-masala/tumbleweed is distributed in the hope that it will be useful,
+torrentkino is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with masala/tumbleweed.  If not, see <http://www.gnu.org/licenses/>.
+along with torrentkino.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #ifndef MALLOC_H
 #define MALLOC_H
 
-#ifdef DEBUG
-extern unsigned long int myalloc_counter;
-extern unsigned long int myfree_counter;
+#include "main.h"
 
-void mem_init( void );
-void mem_print( const char *caller );
+#ifdef NSS
+#define myalloc _nss_tk_myalloc
+#define myfree _nss_tk_myfree
+#define myrealloc _nss_tk_myrealloc
 #endif
 
-void *myalloc( long int size, const char *caller );
-void *myrealloc( void *arg, long int size, const char *caller );
-void myfree( void *arg, const char *caller );
+void *myalloc( long int size );
+void *myrealloc( void *arg, long int size );
+void myfree( void *arg );
 
 #endif /* MALLOC_H */

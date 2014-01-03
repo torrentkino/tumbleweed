@@ -1,27 +1,43 @@
 /*
 Copyright 2006 Aiko Barz
 
-This file is part of masala/tumbleweed.
+This file is part of torrentkino.
 
-masala/tumbleweed is free software: you can redistribute it and/or modify
+torrentkino is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-masala/tumbleweed is distributed in the hope that it will be useful,
+torrentkino is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with masala/tumbleweed.  If not, see <http://www.gnu.org/licenses/>.
+along with torrentkino.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #ifndef LIST_H
 #define LIST_H
 
-#include "main.h"
 #include "malloc.h"
+
+#ifdef NSS
+#define list_add _nss_tk_list_add
+#define list_clear _nss_tk_list_clear
+#define list_del _nss_tk_list_del
+#define list_free _nss_tk_list_free
+#define list_init _nss_tk_list_init
+#define list_ins _nss_tk_list_ins
+#define list_next _nss_tk_list_next
+#define list_prev _nss_tk_list_prev
+#define list_put _nss_tk_list_put
+#define list_rotate _nss_tk_list_rotate
+#define list_size _nss_tk_list_size
+#define list_start _nss_tk_list_start
+#define list_stop _nss_tk_list_stop
+#define list_value _nss_tk_list_value
+#endif
 
 struct obj_list {	
 	struct obj_item *item;

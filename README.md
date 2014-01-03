@@ -3,19 +3,18 @@ tumbleweed(1) -- Instant webserver
 
 ## SYNOPSIS
 
-`tumbleweed` [-d] [-q] [-6] [-s directory] [-p port] [-i index] [-u username]
+`tumbleweed` [-d] [-q] [-6] [-w workdir] [-p port] [-i index]
 
 ## DESCRIPTION
 
 **tumbleweed** is a simple webserver for static content with a low memory footprint
 for the Linux OS. It uses the Linux EPOLL event system, does non-blocking IO,
-supports Zero-Copy and uses all the cores you have. It is actually quite fast.
-Though only a few HTTP features are supported such as HTTP Pipelining,
-Keep-alive and Range Requests as seen in the wild.
+supports Zero-Copy and uses all the cores you have. It is actually really fast.
+It has only a limited HTTP feature set though.
 
 ## OPTIONS
 
-  * `-s` *directory*:
+  * `-w` *workdir*:
     Share this directory. (Default: ~/Public)
 
   * `-p` *port*:
@@ -23,9 +22,6 @@ Keep-alive and Range Requests as seen in the wild.
 
   * `-i` *index*:
 	Serve this file if the requested entity is a directory. (Default: index.html)
-
-  * `-u` *username*:
-    When starting as root, use -u to change the UID.
 
   * `-d`:
 	Start as a daemon and run in background. The output will be send to syslog.
@@ -36,18 +32,24 @@ Keep-alive and Range Requests as seen in the wild.
   * `-6`:
 	IPv6 only.
 
-## INSTALLATION
-  * apt-get install build-essential
-  * apt-get install debhelper
-  * apt-get install git-buildpackage
-  * apt-get install libmagic-dev
-  * git-buildpackage
-
 ## EXAMPLES
 
 Serve *~/Public* at port *8080*:
 
 	$ tumbleweed
+
+## INSTALLATION
+
+There is a simple installation helper for Debian/Ubuntu. Just run one of the
+following commands to create a installable package.
+
+	$ make debian
+	$ make ubuntu
+
+Otherwise, you may use
+
+	$ make
+	$ sudo make install
 
 ## BUGS
 
