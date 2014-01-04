@@ -69,7 +69,7 @@ void send_cork_start( TCP_NODE *n ) {
 	if( setsockopt( n->connfd, IPPROTO_TCP, TCP_CORK, &on, sizeof(on)) != 0 ) {
 		fail( strerror( errno ) );
 	}
-	
+
 	node_status( n, NODE_MODE_SEND_MEM );
 }
 
@@ -118,17 +118,24 @@ void send_file( TCP_NODE *n ) {
 		return;
 	}
 
-	/* Not modified. Stop here. */
+	/* 304 Not Modified */
 	if( n->code == 304 ) {
 		node_status( n, NODE_MODE_SEND_STOP );
 		return;
 	}
 
-	/* Not found */
+	/* 404 Not Found */
 	if( n->code == 404 ) {
 		node_status( n, NODE_MODE_SEND_STOP );
 		return;
 	}
+
+	/* 416 Requested Range Not Satisfiable */
+	if( n->code == 416 ) {
+		node_status( n, NODE_MODE_SEND_STOP );
+		return;
+	}
+
 
 	/* HEAD request. Stop here. */
 	if( n->type == HTTP_HEAD ) {

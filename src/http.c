@@ -635,10 +635,10 @@ void http_416( TCP_NODE *n ) {
 	"<html lang=\"en\" xml:lang=\"en\">"
 	"<head>"
 	"<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />"
-	"<title>Broken range</title>"
+	"<title>Requested Range Not Satisfiable</title>"
 	"</head>"
 	"<body>"
-	"<h1>Broken range</h1>"
+	"<h1>Requested Range Not Satisfiable</h1>"
 	"</body>"
 	"</html>";
 	int size = strlen( buffer );
