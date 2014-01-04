@@ -20,10 +20,10 @@ sync:
 	./bin/sync.sh tumbleweed
 
 debian:
-	./bin/debian.sh
+	./bin/debian.sh tumbleweed
 
 ubuntu:
-	./bin/debian.sh
+	./bin/debian.sh tumbleweed
 
 clean:
 	for dir in $(SUBDIRS); do \

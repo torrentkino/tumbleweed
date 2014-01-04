@@ -1,7 +1,6 @@
-debian/source/
-debian/tumbleweed.debhelper.log
-debian/tumbleweed/
-tumbleweed/tumbleweed
 debian/files
+debian/tumbleweed/
+debian/tumbleweed.debhelper.log
 debian/tumbleweed.substvars
+tumbleweed/tumbleweed
 *.o
