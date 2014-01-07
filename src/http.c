@@ -444,7 +444,7 @@ void http_size( TCP_NODE *n, HASH *head ) {
 		return;
 	}
 
-	strncpy(range, (char *)hash_get(head, (UCHAR *)"Range", 5), BUF_OFF1);
+	strncpy( range, (char *)hash_get( head, (UCHAR *)"Range", 5 ), BUF_OFF1 );
 	range[BUF_OFF1] = '\0';
 	p_start = range;
 
@@ -470,22 +470,29 @@ void http_size( TCP_NODE *n, HASH *head ) {
 	}
 
 	if ( *p_stop == '\0' ) {
-		n->range_stop = n->filesize-1;
+		n->range_stop = n->filesize - 1;
 	} else if ( str_isNumber(p_stop) ) {
 		n->range_stop = atol(p_stop);
 	} else {
 		n->code = 416;
 		return;
 	}
-	
+
 	if ( n->range_start < 0 || n->range_start >= n->filesize ) {
 		n->code = 416;
 		return;
 	}
-	
-	if ( n->range_stop < n->range_start || n->range_stop >= n->filesize ) {
+
+	if ( n->range_stop < n->range_start ) {
 		n->code = 416;
 	   	return;
+	}
+
+	/* Be liberal: Patch the range stop if the end is beyond the end of
+	 * the file. Other webservers also behave like this. zsync uses a stop
+	 * marker, that is beyond the file limits for example... */
+	if ( n->range_stop >= n->filesize ) {
+		n->range_stop = n->filesize - 1;
 	}
 
 	n->f_offset = n->range_start;

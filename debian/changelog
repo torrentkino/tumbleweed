@@ -1,3 +1,8 @@
+tumbleweed (0.5) unstable; urgency=low
+
+  * Removed range requests for now
+
+ -- Aiko Barz <aiko@torrentkino.de>  Tue, 07 Jan 2014 22:52:00 +0100
 tumbleweed (0.4) unstable; urgency=low
 
   * Merged tumbleweed from the torrentkino package
