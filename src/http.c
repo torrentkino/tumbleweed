@@ -61,7 +61,7 @@ long int http_urlDecode( char *src, long int srclen, char *dst, long int dstlen 
 		info( NULL, 400, "http_urlDecode(): URL length is <= 0" );
 		return 0;
 	}
-	
+
 	memset( dst, '\0', dstlen );
 
 	p1 = src;
@@ -84,7 +84,7 @@ long int http_urlDecode( char *src, long int srclen, char *dst, long int dstlen 
 				info( NULL, 500, "http_urlDecode(): Broken characters" );
 				return 0;
 			}
-			
+
 			*p2 = hex;
 			p1 += 2; p2++;
 			j += 3;
@@ -94,7 +94,7 @@ long int http_urlDecode( char *src, long int srclen, char *dst, long int dstlen 
 			j++;
 		}
 
-		i++; 
+		i++;
 	}
 
 	return i;
@@ -117,7 +117,7 @@ HASH *http_hashHeader( char *head ) {
 		/* HTTP/1.0 */
 		return NULL;
 	}
-	
+
 	/* Create hash */
 	hash = hash_init( head_counter );
 
@@ -126,20 +126,20 @@ HASH *http_hashHeader( char *head ) {
 	while( (end = strstr( p, "\r\n")) != NULL ) {
 		memset( end, '\0', 2 );
 		if( (val = strchr( p, ':')) != NULL ) {
-			
+
 			/* Variable & Value */
 			var = p;
 			*val = '\0';
 			val++;
-			
+
 			/* More or less empty spaces */
 			while( *val == ' ' ) {
 				val++;
 			}
-			
+
 			/* Store tuple */
 			hash_put( hash, (UCHAR *)var, strlen( var), val );
-		
+
 		} else {
 			info( NULL, 400, "Missing ':' in header?!" );
 			hash_free( hash );
@@ -230,10 +230,10 @@ void http_buf( TCP_NODE *n ) {
 
 	/* Hash header */
 	head = http_hashHeader( p_head );
-	
+
 	/* Validate input */
 	http_read( n, p_cmd, p_url, p_proto, head );
-	
+
 	/* Delete Hash */
 	http_deleteHeader( head );
 }
@@ -313,7 +313,7 @@ int http_check( TCP_NODE *n, char *p_cmd, char *p_url, char *p_proto ) {
 		node_status( n, NODE_MODE_SHUTDOWN );
 		return 0;
 	}
- 
+
 	/* URL */
 	if( ! str_isValidUTF8( n->entity_url) ) {
 		info( &n->c_addr, 400, "Invalid UTF8 in URL" );
@@ -328,22 +328,22 @@ void http_code( TCP_NODE *n ) {
 	snprintf( n->filename, BUF_SIZE, "%s%s", _main->conf->home, n->entity_url );
 
 	if( file_isreg( n->filename ) ) {
-		
+
 		/* The requested entity is a file */
 		n->code = 200;
-	
+
 	} else if( file_isdir( n->filename ) ) {
 
 		/* There is a index.html file within that directory? */
 		snprintf( n->filename, BUF_SIZE, "%s%s/%s",
 				_main->conf->home, n->entity_url, _main->conf->file );
-		
+
 		if( file_isreg( n->filename ) ) {
 			n->code = 200;
 		} else {
 			n->code = 404;
 		}
-	
+
 	} else {
 
 		n->code = 404;
@@ -548,7 +548,7 @@ void http_304( TCP_NODE *n ) {
 	if( n->keepalive == FALSE ) {
 		keepalive[0] = '\0';
 	}
-	
+
 	/* Compute GMT time */
 	str_GMTtime( datebuf, DATE_SIZE );
 
@@ -570,7 +570,7 @@ void http_200( TCP_NODE *n ) {
 	if( n->keepalive == FALSE ) {
 		keepalive[0] = '\0';
 	}
-	
+
 	/* Compute GMT time */
 	str_GMTtime( datebuf, DATE_SIZE );
 

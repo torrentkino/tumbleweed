@@ -64,7 +64,7 @@ ITEM *node_put( void ) {
 	/* Receive buffer */
 	memset( n->recv_buf, '\0', BUF_SIZE );
 	n->recv_size = 0;
-	
+
 	/* Send buffer */
 	memset( n->send_buf, '\0', BUF_SIZE );
 	n->send_offset = 0;
@@ -96,7 +96,7 @@ ITEM *node_put( void ) {
 
 	/* HTTP code */
 	n->code = 0;
-	
+
 	/* HTTP request type */
 	n->type = HTTP_UNKNOWN;
 
@@ -210,7 +210,7 @@ void node_cleanup( void ) {
 	ITEM *thisnode = NULL;
 	ITEM *nextnode = NULL;
 	TCP_NODE *n = NULL;
-	
+
 	if( list_size( _main->node ) == 0 ) {
 		return;
 	}
@@ -232,7 +232,7 @@ void node_cleanup( void ) {
 		} else {
 			n->keepalive_counter--;
 		}
-		
+
 		thisnode = nextnode;
 	}
 }

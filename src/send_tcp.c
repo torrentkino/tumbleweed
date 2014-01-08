@@ -81,21 +81,21 @@ void send_mem( TCP_NODE *n ) {
 	while( status == RUMBLE ) {
 		p = n->send_buf + n->send_offset;
 		bytes_todo = n->send_size - n->send_offset;
-	
+
 		bytes_sent = send( n->connfd, p, bytes_todo, 0 );
-	
+
 		if( bytes_sent < 0 ) {
 			if( errno == EAGAIN || errno == EWOULDBLOCK ) {
 				return;
 			}
-	
+
 			/* Client closed the connection, etc... */
 			node_status( n, NODE_MODE_SHUTDOWN );
 			return;
 		}
-	
+
 		n->send_offset += bytes_sent;
-		
+
 		/* Done */
 		if( n->send_offset >= n->send_size ) {
 			node_status( n, NODE_MODE_SEND_FILE );
@@ -144,12 +144,12 @@ void send_file( TCP_NODE *n ) {
 	}
 
 	while( status == RUMBLE ) {
-		fh = open( n->filename, O_RDONLY );	
+		fh = open( n->filename, O_RDONLY );
 		if( fh < 0 ) {
 			info( NULL, 500, "Failed to open %s", n->filename );
 			fail( strerror( errno) );
 		}
-	
+
 		/* The SIGPIPE gets catched in sig.c */
 #ifdef RANGE
 		bytes_sent = sendfile( n->connfd, fh, &n->f_offset, n->content_length );
@@ -167,12 +167,12 @@ void send_file( TCP_NODE *n ) {
 				/* connfd is blocking */
 				return;
 			}
-			
+
 			/* Client closed the connection, etc... */
 			node_status( n, NODE_MODE_SHUTDOWN );
 			return;
 		}
-		
+
 		/* Done */
 #ifdef RANGE
 		if( n->f_offset >= n->f_stop ) {
