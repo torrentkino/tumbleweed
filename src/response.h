@@ -17,9 +17,39 @@ You should have received a copy of the GNU General Public License
 along with torrentkino.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-void send_tcp( TCP_NODE *n );
-void send_cork_start( TCP_NODE *n );
-void send_data( TCP_NODE *n );
-void send_mem( TCP_NODE *n, ITEM *item_r );
-void send_file( TCP_NODE *n, ITEM *item_r );
-void send_cork_stop( TCP_NODE *n );
+#ifndef RESPONSE_H
+#define RESPONSE_H
+
+#include "list.h"
+
+#define RESPONSE_FROM_MEMORY 0
+#define RESPONSE_FROM_FILE 1
+
+typedef struct {
+	char send_buf[BUF_SIZE];
+	int send_size;
+	int send_offset;
+} R_MEMORY;
+
+typedef struct {
+	char filename[BUF_SIZE];
+	off_t f_offset;
+	off_t f_stop;
+} R_FILE;
+
+typedef struct {
+	int type;
+
+	union  {
+		R_MEMORY memory;
+		R_FILE file;
+	} data;
+} RESPONSE;
+
+LIST *resp_init( void );
+void resp_free( LIST *list );
+
+RESPONSE *resp_put( LIST *list, int TYPE );
+void resp_del( LIST *list, ITEM *item );
+
+#endif /* RESPONSE_H */

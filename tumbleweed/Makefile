@@ -3,10 +3,11 @@ export CC = gcc
 export CFLAGS = -O2 -std=gnu99 -Wall -Wwrite-strings -pedantic
 CFLAGS += -DTUMBLEWEED -DIPV6
 CFLAGS += -DMAGIC
+#CFLAGS += -g
 LDFLAGS = -lpthread
 LDFLAGS += -lmagic
 OBJS = ben.o conf.o fail.o file.o hash.o http.o list.o log.o \
-	malloc.o mime.o node_tcp.o opts.o \
+	malloc.o mime.o node_tcp.o opts.o range.o response.o \
 	send_tcp.o str.o tcp.o thrd.o tumbleweed.o unix.o \
 	worker.o
 

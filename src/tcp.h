@@ -44,7 +44,6 @@ void tcp_stop( void );
 
 int tcp_nonblocking( int sock );
 void tcp_event( void );
-void tcp_cron( void );
 
 void *tcp_thread( void *arg );
 void tcp_worker( struct epoll_event *events, int nfds, int thrd_id );

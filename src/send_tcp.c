@@ -52,11 +52,8 @@ void send_tcp( TCP_NODE *n ) {
 		case NODE_MODE_SEND_INIT:
 			send_cork_start( n );
 
-		case NODE_MODE_SEND_MEM:
-			send_mem( n );
-
-		case NODE_MODE_SEND_FILE:
-			send_file( n );
+		case NODE_MODE_SEND_DATA:
+			send_data( n );
 
 		case NODE_MODE_SEND_STOP:
 			send_cork_stop( n );
@@ -66,21 +63,52 @@ void send_tcp( TCP_NODE *n ) {
 void send_cork_start( TCP_NODE *n ) {
 	int on = 1;
 
+	if( n->mode != NODE_MODE_SEND_INIT ) {
+		return;
+	}
+
 	if( setsockopt( n->connfd, IPPROTO_TCP, TCP_CORK, &on, sizeof(on)) != 0 ) {
 		fail( strerror( errno ) );
 	}
 
-	node_status( n, NODE_MODE_SEND_MEM );
+	node_status( n, NODE_MODE_SEND_DATA );
 }
 
-void send_mem( TCP_NODE *n ) {
+void send_data( TCP_NODE *n ) {
+	ITEM *i = NULL;
+	RESPONSE *r = NULL;
+
+	if( n->mode != NODE_MODE_SEND_DATA ) {
+		return;
+	}
+
+	while( status == RUMBLE && list_size( n->response ) > 0 ) {
+		i = list_start( n->response );
+		r = list_value( i );
+
+		if( r->type == RESPONSE_FROM_MEMORY ) {
+			send_mem( n, i );
+		} else {
+			send_file( n, i );
+		}
+
+		if( n->mode == NODE_MODE_SHUTDOWN ) {
+			return;
+		}
+	}
+
+	node_status( n, NODE_MODE_SEND_STOP );
+}
+
+void send_mem( TCP_NODE *n, ITEM *item_r ) {
+	RESPONSE *r = list_value( item_r );
 	ssize_t bytes_sent = 0;
-	int bytes_todo = 0;
+	ssize_t bytes_todo = 0;
 	char *p = NULL;
 
 	while( status == RUMBLE ) {
-		p = n->send_buf + n->send_offset;
-		bytes_todo = n->send_size - n->send_offset;
+		p = r->data.memory.send_buf + r->data.memory.send_offset;
+		bytes_todo = r->data.memory.send_size - r->data.memory.send_offset;
 
 		bytes_sent = send( n->connfd, p, bytes_todo, 0 );
 
@@ -94,71 +122,35 @@ void send_mem( TCP_NODE *n ) {
 			return;
 		}
 
-		n->send_offset += bytes_sent;
+		r->data.memory.send_offset += bytes_sent;
 
 		/* Done */
-		if( n->send_offset >= n->send_size ) {
-			node_status( n, NODE_MODE_SEND_FILE );
+		if( r->data.memory.send_offset >= r->data.memory.send_size ) {
+			resp_del( n->response, item_r );
 			return;
 		}
 	}
 }
 
-void send_file( TCP_NODE *n ) {
+void send_file( TCP_NODE *n, ITEM *item_r ) {
+	RESPONSE *r = list_value( item_r );
 	ssize_t bytes_sent = 0;
+	ssize_t bytes_todo = 0;
 	int fh = 0;
 
-	if( n->mode != NODE_MODE_SEND_FILE ) {
-		return;
-	}
-
-	/* Nothing to do */
-	if( n->filesize == 0 ) {
-		node_status( n, NODE_MODE_SEND_STOP );
-		return;
-	}
-
-	/* 304 Not Modified */
-	if( n->code == 304 ) {
-		node_status( n, NODE_MODE_SEND_STOP );
-		return;
-	}
-
-	/* 404 Not Found */
-	if( n->code == 404 ) {
-		node_status( n, NODE_MODE_SEND_STOP );
-		return;
-	}
-
-	/* 416 Requested Range Not Satisfiable */
-	if( n->code == 416 ) {
-		node_status( n, NODE_MODE_SEND_STOP );
-		return;
-	}
-
-
-	/* HEAD request. Stop here. */
-	if( n->type == HTTP_HEAD ) {
-		node_status( n, NODE_MODE_SEND_STOP );
-		return;
-	}
-
 	while( status == RUMBLE ) {
-		fh = open( n->filename, O_RDONLY );
+		fh = open( r->data.file.filename, O_RDONLY );
 		if( fh < 0 ) {
-			info( NULL, 500, "Failed to open %s", n->filename );
+			info( NULL, 500, "Failed to open %s", r->data.file.filename );
 			fail( strerror( errno) );
 		}
 
+		bytes_todo = r->data.file.f_stop + 1 - r->data.file.f_offset;
 		/* The SIGPIPE gets catched in sig.c */
-#ifdef RANGE
-		bytes_sent = sendfile( n->connfd, fh, &n->f_offset, n->content_length );
-#else
-		bytes_sent = sendfile( n->connfd, fh, &n->f_offset, n->filesize );
-#endif
+		bytes_sent = sendfile( n->connfd, fh, &r->data.file.f_offset, bytes_todo );
 
 		if( close( fh ) != 0 ) {
-			info( NULL, 500, "Failed to close %s", n->filename );
+			info( NULL, 500, "Failed to close %s", r->data.file.filename );
 			fail( strerror( errno) );
 		}
 
@@ -174,12 +166,8 @@ void send_file( TCP_NODE *n ) {
 		}
 
 		/* Done */
-#ifdef RANGE
-		if( n->f_offset >= n->f_stop ) {
-#else
-		if( n->f_offset >= n->filesize ) {
-#endif
-			node_status( n, NODE_MODE_SEND_STOP );
+		if( r->data.file.f_offset > r->data.file.f_stop ) {
+			resp_del( n->response, item_r );
 			return;
 		}
 	}
@@ -196,14 +184,12 @@ void send_cork_stop( TCP_NODE *n ) {
 		fail( strerror( errno ) );
 	}
 
-	/* Clear input and output buffers */
-	node_clearSendBuf( n );
-
-	/* Mark TCP server ready */
-	node_status( n, NODE_MODE_READY );
-
-	/* HTTP Pipeline: There is at least one more request to parse. */
-	if( n->recv_size > 0 ) {
-		http_buf( n );
+	/* Done, Ready or shutdown connection. */
+	switch( n->keepalive ) {
+		case HTTP_KEEPALIVE:
+			node_status( n, NODE_MODE_READY );
+			break;
+		default:
+			node_status( n, NODE_MODE_SHUTDOWN );
 	}
 }

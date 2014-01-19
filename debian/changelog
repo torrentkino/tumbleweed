@@ -1,24 +1,31 @@
-tumbleweed (0.5) unstable; urgency=low
+tumbleweed (0.6) wheezy; urgency=low
+
+  * Added range requests again.
+  * Added multipart ranges used by zsync.
+  * Complete new delivery infrastructure for the features above.
+
+ -- Aiko Barz <aiko@torrentkino.de>  Sun, 19 Jan 2014 14:44:00 +0100
+tumbleweed (0.5) wheezy; urgency=low
 
   * Removed range requests for now
 
  -- Aiko Barz <aiko@torrentkino.de>  Tue, 07 Jan 2014 22:52:00 +0100
-tumbleweed (0.4) unstable; urgency=low
+tumbleweed (0.4) wheezy; urgency=low
 
   * Merged tumbleweed from the torrentkino package
 
  -- Aiko Barz <aiko@torrentkino.de>  Fri, 03 Jan 2014 20:47:00 +0100
-tumbleweed (0.3) unstable; urgency=low
+tumbleweed (0.3) wheezy; urgency=low
 
   * Drop idle HTTP sessions in a safe manner.
 
  -- Aiko Barz <aiko@tumbleweed.de>  Fri, 22 Mar 2013 21:38:00 +0100
-tumbleweed (0.2) unstable; urgency=low
+tumbleweed (0.2) wheezy; urgency=low
 
   * Logging changes
 
  -- Aiko Barz <aiko@tumbleweed.de>  Fri, 15 Mar 2013 21:30:00 +0100
-tumbleweed (0.1) unstable; urgency=low
+tumbleweed (0.1) wheezy; urgency=low
 
   * tumbleweed: Initial release
 

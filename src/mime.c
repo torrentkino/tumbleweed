@@ -77,8 +77,8 @@ void mime_load( void ) {
 	mime_add( "ico", "image/x-ico; charset=binary" );
 	mime_add( "iso", "application/x-iso9660-image; charset=binary" );
 	mime_add( "js", "application/x-javascript" );
-	mime_add( "jpg", "image/jpeg; charset=binary" );
-	mime_add( "jpeg", "image/jpeg; charset=binary" );
+	mime_add( "jpg", "image/jpeg" );
+	mime_add( "jpeg", "image/jpeg" );
 	mime_add( "m3u", "text/plain; charset=utf-8" );
 	mime_add( "m4v", "video/mp4; charset=binary" );
 	mime_add( "mkv", "video/x-matroska; charset=binary" );
@@ -100,12 +100,14 @@ void mime_load( void ) {
 	mime_add( "woff", "application/font-woff" );
 	mime_add( "xml", "application/xml; charset=utf-8" );
 	mime_add( "zip", "application/zip; charset=binary" );
+	mime_add( "zsync", "application/octet-stream" );
+//	mime_add( "zsync", "application/x-zsync; charset=binary" );
 }
 
 void mime_hash( void ) {
 	ITEM *item = NULL;
 	struct obj_mime *tuple = NULL;
-	
+
 	if( list_size( _main->mime->list ) < 1 ) {
 		return;
 	}

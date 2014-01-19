@@ -72,11 +72,11 @@ void tcp_start( void ) {
 	if( ( _main->tcp->sockfd = socket( PF_INET6, SOCK_STREAM, 0 ) ) < 0 ) {
 		fail( "Creating socket failed." );
 	}
-	
+
 	_main->tcp->s_addr.sin6_family = AF_INET6;
 	_main->tcp->s_addr.sin6_port = htons( _main->conf->port );
 	_main->tcp->s_addr.sin6_addr = in6addr_any;
-	
+
 	if( setsockopt( _main->tcp->sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof( int ) ) == -1 ) {
 		fail( "Setting SO_REUSEADDR failed" );
 	}
@@ -96,7 +96,7 @@ void tcp_start( void ) {
 	if( tcp_nonblocking( _main->tcp->sockfd ) < 0 ) {
 		fail( "tcp_nonblocking( _main->tcp->sockfd ) failed" );
 	}
-	
+
 	if( listen( _main->tcp->sockfd, listen_queue_length ) ) {
 		fail( "listen() to socket failed." );
 	} else {
@@ -126,7 +126,7 @@ void tcp_stop( void ) {
 
 void tcp_event( void ) {
 	struct epoll_event ev;
-	
+
 	_main->tcp->epollfd = epoll_create( 23 );
 	if( _main->tcp->epollfd == -1 ) {
 		fail( "epoll_create() failed" );
@@ -148,27 +148,31 @@ void *tcp_thread( void *arg ) {
 	mutex_block( _main->work->mutex );
 	id = _main->work->id++;
 	mutex_unblock( _main->work->mutex );
-	
+
 	info( NULL, 0, "Thread[%i] - Max events: %i", id, CONF_EPOLL_MAX_EVENTS );
 
 	for( ;; ) {
 		nfds = epoll_wait( _main->tcp->epollfd, events, CONF_EPOLL_MAX_EVENTS, CONF_EPOLL_WAIT );
 
-		if( status == RUMBLE && nfds == -1 ) {
+		if( status != RUMBLE ) {
+			/* Shutdown server */
+			break;
+		}
+
+		if( nfds == -1 ) {
 			if( errno != EINTR ) {
 				info( NULL, 500, "epoll_wait() failed" );
 				fail( strerror( errno ) );
 			}
-		} else if( status == RUMBLE && nfds == 0 ) {
+#if 0
+		} else if( nfds == 0 ) {
 			/* Timeout wakeup */
 			if( id == 0 ) {
 				tcp_cron();
 			}
-		} else if( status == RUMBLE && nfds > 0 ) {
+#endif
+		} else if( nfds > 0 ) {
 			tcp_worker( events, nfds, id );
-		} else {
-			/* Shutdown server */
-			break;
 		}
 	}
 
@@ -188,7 +192,7 @@ void tcp_worker( struct epoll_event *events, int nfds, int thrd_id ) {
 			tcp_newconn();
 		} else {
 			listItem = events[i].data.ptr;
-	
+
 			if( events[i].events & EPOLLIN ) {
 				tcp_input( listItem );
 			} else if( events[i].events & EPOLLOUT ) {
@@ -216,8 +220,7 @@ void tcp_gate( ITEM *listItem ) {
 			tcp_rearm( listItem, TCP_INPUT );
 			break;
 		case NODE_MODE_SEND_INIT:
-		case NODE_MODE_SEND_MEM:
-		case NODE_MODE_SEND_FILE:
+		case NODE_MODE_SEND_DATA:
 		case NODE_MODE_SEND_STOP:
 			tcp_rearm( listItem, TCP_OUTPUT );
 			break;
@@ -237,7 +240,7 @@ void tcp_rearm( ITEM *listItem, int mode ) {
 	} else {
 		ev.events = EPOLLET | EPOLLOUT | EPOLLONESHOT;
 	}
-	
+
 	ev.data.ptr = listItem;
 
 	if( epoll_ctl( _main->tcp->epollfd, EPOLL_CTL_MOD, n->connfd, &ev ) == -1 ) {
@@ -287,7 +290,7 @@ void tcp_newconn( void ) {
 			node_disconnect( connfd );
 			break;
 		}
-		
+
 		/* Store data */
 		n = list_value( listItem );
 		n->connfd = connfd;
@@ -308,18 +311,13 @@ void tcp_newconn( void ) {
 	}
 }
 
-void tcp_output( ITEM *listItem ) {
-	TCP_NODE *n = list_value( listItem );
-	
+void tcp_output( ITEM *i ) {
+	TCP_NODE *n = list_value( i );
+
 	switch( n->mode ) {
 		case NODE_MODE_SEND_INIT:
-		case NODE_MODE_SEND_MEM:
-		case NODE_MODE_SEND_FILE:
+		case NODE_MODE_SEND_DATA:
 		case NODE_MODE_SEND_STOP:
-			
-			/* Reset timeout counter */
-			node_activity( n );
-			
 			/* Send file */
 			send_tcp( n );
 			break;
@@ -330,12 +328,9 @@ void tcp_input( ITEM *listItem ) {
 	TCP_NODE *n = list_value( listItem );
 	char buffer[BUF_SIZE];
 	ssize_t bytes = 0;
-	
+
 	while( status == RUMBLE ) {
 
-		/* Reset timeout counter */
-		node_activity( n );
-		
 		/* Get data */
 		bytes = recv( n->connfd, buffer, BUF_OFF1, 0 );
 
@@ -381,15 +376,9 @@ void tcp_buffer( TCP_NODE *n, char *buffer, ssize_t bytes ) {
 		return;
 	}
 
+	/* Parse request */
 	http_buf( n );
-}
 
-void tcp_cron( void ) {
-	mutex_block( _main->work->mutex );
-
-	/* Do some jobs while no worker is running */
-	if( _main->work->active == 0 ) {
-		node_cleanup();
-	}
-	mutex_unblock( _main->work->mutex );
+	/* Start sending data */
+	http_send( n );
 }
