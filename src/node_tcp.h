@@ -25,7 +25,6 @@ along with torrentkino.  If not, see <http://www.gnu.org/licenses/>.
 #include "hash.h"
 #include "list.h"
 #include "log.h"
-#include "range.h"
 #include "response.h"
 
 #define NODE_MODE_READY   	1
