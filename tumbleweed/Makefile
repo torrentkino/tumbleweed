@@ -7,7 +7,7 @@ CFLAGS += -DMAGIC
 LDFLAGS = -lpthread
 LDFLAGS += -lmagic
 OBJS = ben.o conf.o fail.o file.o hash.o http.o list.o log.o \
-	malloc.o mime.o node_tcp.o opts.o range.o response.o \
+	malloc.o mime.o node_tcp.o opts.o response.o \
 	send_tcp.o str.o tcp.o thrd.o tumbleweed.o unix.o \
 	worker.o
 
