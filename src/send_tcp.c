@@ -48,14 +48,14 @@ along with torrentkino.  If not, see <http://www.gnu.org/licenses/>.
 #include "http.h"
 
 void send_tcp( TCP_NODE *n ) {
-	switch( n->mode ) {
-		case NODE_MODE_SEND_INIT:
+	switch( n->pipeline ) {
+		case NODE_SEND_INIT:
 			send_cork_start( n );
 
-		case NODE_MODE_SEND_DATA:
+		case NODE_SEND_DATA:
 			send_data( n );
 
-		case NODE_MODE_SEND_STOP:
+		case NODE_SEND_STOP:
 			send_cork_stop( n );
 	}
 }
@@ -63,7 +63,7 @@ void send_tcp( TCP_NODE *n ) {
 void send_cork_start( TCP_NODE *n ) {
 	int on = 1;
 
-	if( n->mode != NODE_MODE_SEND_INIT ) {
+	if( n->pipeline != NODE_SEND_INIT ) {
 		return;
 	}
 
@@ -71,14 +71,14 @@ void send_cork_start( TCP_NODE *n ) {
 		fail( strerror( errno ) );
 	}
 
-	node_status( n, NODE_MODE_SEND_DATA );
+	node_status( n, NODE_SEND_DATA );
 }
 
 void send_data( TCP_NODE *n ) {
 	ITEM *i = NULL;
 	RESPONSE *r = NULL;
 
-	if( n->mode != NODE_MODE_SEND_DATA ) {
+	if( n->pipeline != NODE_SEND_DATA ) {
 		return;
 	}
 
@@ -92,12 +92,12 @@ void send_data( TCP_NODE *n ) {
 			send_file( n, i );
 		}
 
-		if( n->mode == NODE_MODE_SHUTDOWN ) {
+		if( n->pipeline == NODE_SHUTDOWN ) {
 			return;
 		}
 	}
 
-	node_status( n, NODE_MODE_SEND_STOP );
+	node_status( n, NODE_SEND_STOP );
 }
 
 void send_mem( TCP_NODE *n, ITEM *item_r ) {
@@ -118,7 +118,7 @@ void send_mem( TCP_NODE *n, ITEM *item_r ) {
 			}
 
 			/* Client closed the connection, etc... */
-			node_status( n, NODE_MODE_SHUTDOWN );
+			node_status( n, NODE_SHUTDOWN );
 			return;
 		}
 
@@ -161,7 +161,7 @@ void send_file( TCP_NODE *n, ITEM *item_r ) {
 			}
 
 			/* Client closed the connection, etc... */
-			node_status( n, NODE_MODE_SHUTDOWN );
+			node_status( n, NODE_SHUTDOWN );
 			return;
 		}
 
@@ -176,7 +176,7 @@ void send_file( TCP_NODE *n, ITEM *item_r ) {
 void send_cork_stop( TCP_NODE *n ) {
 	int off = 0;
 
-	if( n->mode != NODE_MODE_SEND_STOP ) {
+	if( n->pipeline != NODE_SEND_STOP ) {
 		return;
 	}
 
@@ -187,9 +187,9 @@ void send_cork_stop( TCP_NODE *n ) {
 	/* Done, Ready or shutdown connection. */
 	switch( n->keepalive ) {
 		case HTTP_KEEPALIVE:
-			node_status( n, NODE_MODE_READY );
+			node_status( n, NODE_READY );
 			break;
 		default:
-			node_status( n, NODE_MODE_SHUTDOWN );
+			node_status( n, NODE_SHUTDOWN );
 	}
 }

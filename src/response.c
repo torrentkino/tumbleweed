@@ -30,6 +30,7 @@ along with torrentkino.  If not, see <http://www.gnu.org/licenses/>.
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/tcp.h>
+#include <stdarg.h>
 
 #include "response.h"
 
@@ -86,4 +87,18 @@ void resp_del( LIST *list, ITEM *item ) {
 	myfree( r );
 
 	list_del( list, item );
+}
+
+int resp_set_memory( RESPONSE *r, const char *format, ... ) {
+	va_list vlist;
+
+	memset( r->data.memory.send_buf, '\0', BUF_SIZE );
+
+	va_start( vlist, format );
+	vsnprintf( r->data.memory.send_buf, BUF_SIZE, format, vlist );
+	va_end( vlist );
+
+	r->data.memory.send_size = strlen( r->data.memory.send_buf );
+
+	return r->data.memory.send_size;
 }

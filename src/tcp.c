@@ -212,16 +212,16 @@ void tcp_worker( struct epoll_event *events, int nfds, int thrd_id ) {
 void tcp_gate( ITEM *listItem ) {
 	TCP_NODE *n = list_value( listItem );
 
-	switch( n->mode ) {
-		case NODE_MODE_SHUTDOWN:
+	switch( n->pipeline ) {
+		case NODE_SHUTDOWN:
 			node_shutdown( listItem );
 			break;
-		case NODE_MODE_READY:
+		case NODE_READY:
 			tcp_rearm( listItem, TCP_INPUT );
 			break;
-		case NODE_MODE_SEND_INIT:
-		case NODE_MODE_SEND_DATA:
-		case NODE_MODE_SEND_STOP:
+		case NODE_SEND_INIT:
+		case NODE_SEND_DATA:
+		case NODE_SEND_STOP:
 			tcp_rearm( listItem, TCP_OUTPUT );
 			break;
 		default:
@@ -314,10 +314,10 @@ void tcp_newconn( void ) {
 void tcp_output( ITEM *i ) {
 	TCP_NODE *n = list_value( i );
 
-	switch( n->mode ) {
-		case NODE_MODE_SEND_INIT:
-		case NODE_MODE_SEND_DATA:
-		case NODE_MODE_SEND_STOP:
+	switch( n->pipeline ) {
+		case NODE_SEND_INIT:
+		case NODE_SEND_DATA:
+		case NODE_SEND_STOP:
 			/* Send file */
 			send_tcp( n );
 			break;
@@ -342,7 +342,7 @@ void tcp_input( ITEM *listItem ) {
 				 * Very common behaviour
 				 * info( &n->c_addr, 0, "Connection reset by peer" );
 				 */
-				node_status( n, NODE_MODE_SHUTDOWN );
+				node_status( n, NODE_SHUTDOWN );
 				return;
 			} else {
 				info( &n->c_addr, 0, "recv() failed:" );
@@ -351,7 +351,7 @@ void tcp_input( ITEM *listItem ) {
 			}
 		} else if( bytes == 0 ) {
 			/* Regular shutdown */
-			node_status( n, NODE_MODE_SHUTDOWN );
+			node_status( n, NODE_SHUTDOWN );
 			return;
 		} else {
 			/* Read */
@@ -365,14 +365,14 @@ void tcp_buffer( TCP_NODE *n, char *buffer, ssize_t bytes ) {
 	/* Append buffer */
 	node_appendBuffer( n, buffer, bytes );
 
-	if( n->mode != NODE_MODE_READY ) {
+	if( n->pipeline != NODE_READY ) {
 		fail( "FIXME tcp_buffer..." );
 	}
 
 	/* Overflow? */
 	if( n->recv_size >= BUF_OFF1 ) {
 		info( &n->c_addr, 500, "Max head buffer exceeded..." );
-		node_status( n, NODE_MODE_SHUTDOWN );
+		node_status( n, NODE_SHUTDOWN );
 		return;
 	}
 

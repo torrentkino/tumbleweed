@@ -22,10 +22,6 @@ along with torrentkino.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "list.h"
 
-#define HTTP_UNKNOWN 0
-#define HTTP_GET 1
-#define HTTP_HEAD 2
-
 #define HTTP_UNDEF 0
 #define HTTP_CLOSE 1
 #define HTTP_KEEPALIVE 2
@@ -42,33 +38,38 @@ void http_buf( TCP_NODE *n );
 void http_read( TCP_NODE *n, char *p_cmd, char *p_url, char *p_proto,
 		HASH *p_head );
 
-int http_action( TCP_NODE *n, char *p_cmd, int *action );
-int http_proto( TCP_NODE *n, char *p_proto, int *proto );
+int http_action( TCP_NODE *n, char *p_cmd );
+int http_proto( TCP_NODE *n, char *p_proto );
 int http_resource( TCP_NODE *n, char *p_url, char *resource );
 
 int http_filename( char *resource, char *filename );
-int http_keepalive( HASH *head );
-int http_lastmodified( char *filename, HASH *head, int code, char *lastmodified );
-int http_range( HASH *head, char *range );
+int http_keepalive( HASH *head, char *keepalive );
+int http_resource_modified( char *filename, HASH *head,
+		char *lastmodified );
+int http_range_detected( HASH *head, char *range );
 int http_range_prepare( char **p_range );
 int http_range_multipart( char *p_range );
 
 int http_size( TCP_NODE *n, HASH *head, char *filename );
 size_t http_size_simple( char *filename );
-int http_range_simple( TCP_NODE *n, RESPONSE *r, char *filename, size_t filesize, char *p_range, size_t *content_length );
-int http_range_complex( TCP_NODE *n, char *filename, size_t filesize, char *p_range, size_t *content_length, char *boundary );
+int http_range_simple( TCP_NODE *n, RESPONSE *r,
+		char *filename, size_t filesize,
+		char *p_range, size_t *content_length );
+int http_range_complex( TCP_NODE *n, char *filename, size_t filesize, const char *mimetype,
+		char *p_range, size_t *content_length, char *boundary );
 
-void http_404( TCP_NODE *n, int proto );
-void http_304( TCP_NODE *n, int proto );
-void http_200( TCP_NODE *n, char *lastmodified, char *filename, size_t filesize, int proto );
+void http_404( TCP_NODE *n, char *keepalive );
+void http_304( TCP_NODE *n, char *keepalive );
+void http_200( TCP_NODE *n, char *lastmodified,
+		char *filename, size_t filesize, char *keepalive, const char *mimetype );
 void http_206_simple( TCP_NODE *n, RESPONSE *r_head, RESPONSE *r_file,
 		char *lastmodified, char *filename, size_t filesize,
-		int proto, size_t content_length );
+		size_t content_length, char *keepalive, const char *mimetype );
 void http_206_complex( TCP_NODE *n, RESPONSE *r_head,
-		char *lastmodified, char *filename, size_t filesize, int proto,
-		size_t content_length, char *boundary );
+		char *lastmodified, char *filename, size_t filesize,
+		size_t content_length, char *boundary, char *keepalive );
 void http_206_boundary_head( RESPONSE *r_head, RESPONSE *r_file,
-		char *filename, size_t filesize,
+		char *filename, size_t filesize, const char *mimetype,
 		char *boundary, size_t *content_size );
 void http_newline( RESPONSE *r, size_t *content_size );
 void http_206_boundary_finish( RESPONSE *r, size_t *content_length,

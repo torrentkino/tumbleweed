@@ -52,4 +52,6 @@ void resp_free( LIST *list );
 RESPONSE *resp_put( LIST *list, int TYPE );
 void resp_del( LIST *list, ITEM *item );
 
+int resp_set_memory( RESPONSE *r, const char *format, ... );
+
 #endif /* RESPONSE_H */

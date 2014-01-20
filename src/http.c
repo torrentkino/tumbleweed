@@ -202,7 +202,7 @@ void http_buf( TCP_NODE *n ) {
 	/* Find url */
 	if( (p_url = strchr( p_cmd, ' ')) == NULL ) {
 		info( &n->c_addr, 400, "Requested URL was not found" );
-		node_status( n, NODE_MODE_SHUTDOWN );
+		node_status( n, NODE_SHUTDOWN );
 		return;
 	}
 	*p_url = '\0'; p_url++;
@@ -210,7 +210,7 @@ void http_buf( TCP_NODE *n ) {
 	/* Find protocol type */
 	if( (p_proto = strchr( p_url, ' ')) == NULL ) {
 		info( &n->c_addr, 400, "No protocol found in request" );
-		node_status( n, NODE_MODE_SHUTDOWN );
+		node_status( n, NODE_SHUTDOWN );
 		return;
 	}
 	*p_proto = '\0'; p_proto++;
@@ -223,7 +223,7 @@ void http_buf( TCP_NODE *n ) {
 	/* Find header lines */
 	if( (p_head = strstr( p_proto, "\r\n")) == NULL ) {
 		info( &n->c_addr, 400, "There must be a \\r\\n. I put it there..." );
-		node_status( n, NODE_MODE_SHUTDOWN );
+		node_status( n, NODE_SHUTDOWN );
 		return;
 	}
 	*p_head = '\0'; p_head++;
@@ -248,120 +248,105 @@ void http_read( TCP_NODE *n, char *p_cmd, char *p_url, char *p_proto,
 	char filename[BUF_SIZE];
 	char range[BUF_SIZE];
 	char *p_range = range;
-	int proto = HTTP_1_1;
-	int action = HTTP_UNKNOWN;
-	int multipart_ranges = FALSE;
 	size_t filesize = 0;
 	size_t content_length = 0;
+	char keepalive[BUF_SIZE];
+	const char *mimetype = NULL;
 
 	/* Get protocol */
-	if( !http_proto( n, p_proto, &proto ) ) {
-		node_status( n, NODE_MODE_SHUTDOWN );
+	if( !http_proto( n, p_proto ) ) {
+		node_status( n, NODE_SHUTDOWN );
 		goto END;
 	}
 
 	/* Get action */
-	if( !http_action( n, p_cmd, &action ) ) {
-		node_status( n, NODE_MODE_SHUTDOWN );
+	if( !http_action( n, p_cmd ) ) {
+		node_status( n, NODE_SHUTDOWN );
 		goto END;
 	}
 
 	/* Get resource */
 	if( !http_resource( n, p_url, resource ) ) {
-		node_status( n, NODE_MODE_SHUTDOWN );
+		node_status( n, NODE_SHUTDOWN );
 		goto END;
 	}
 
 	/* Check Keep-Alive */
-	n->keepalive = http_keepalive( p_head );
+	n->keepalive = http_keepalive( p_head, keepalive );
 
 	/* Compute filename */
-	/* 200, 404 */
-	code = http_filename( resource, filename );
-
-	if( code == 404 ) {
-		http_404( n, proto );
-		info( &n->c_addr, code, resource );
+	if( ! http_filename( resource, filename ) ) {
+		http_404( n, keepalive );
+		info( &n->c_addr, 404, resource );
 		goto END;
 	}
 
+	/* Compute file size */
 	filesize = http_size_simple( filename );
 
-	/* Last-Modified. */
-	/* 200, 304 */
-	code = http_lastmodified( filename, p_head, code, lastmodified );
+	/* Compute mime type */
+	mimetype = mime_find( filename );
 
-	if( code == 304 ) {
-		http_304( n, proto );
-		info( &n->c_addr, code, resource );
+	/* Last-Modified. */
+	if( ! http_resource_modified( filename, p_head, lastmodified ) ) {
+		http_304( n, keepalive );
+		info( &n->c_addr, 304, resource );
 		goto END;
 	}
 
 	/* Range request? */
-	/* 200, 206 */
-	code = http_range( p_head, range );
-
-	/* HEAD request: Do not send a body */
-	if( code == 200 && action == HTTP_HEAD ) {
-		http_200( n, lastmodified, filename, filesize, proto );
-		info( &n->c_addr, code, resource );
-		goto END;
+	if( http_range_detected( p_head, range ) ) {
+		code = 206;
+	} else {
+		code = 200;
 	}
 
 	/* Normal 200-er request */
 	if( code == 200 ) {
 		info( &n->c_addr, code, resource );
-		http_200( n, lastmodified, filename, filesize, proto );
+		http_200( n, lastmodified, filename, filesize, keepalive, mimetype );
 		http_body( n, filename, filesize );
 		goto END;
 	}
 
 	/* Check for 'bytes=' in range. Fallback to 200 if necessary. */
-	if( code == 206 && !http_range_prepare( &p_range ) ) {
+	if( !http_range_prepare( &p_range ) ) {
 		info( &n->c_addr, 200, resource );
-		http_200( n, lastmodified, filename, filesize, proto );
+		http_200( n, lastmodified, filename, filesize, keepalive, mimetype );
 		http_body( n, filename, filesize );
 		goto END;
 	}
 
 	/* multipart/byteranges */
-	if( code == 206 && http_range_multipart( p_range ) ) {
-		multipart_ranges = TRUE;
-	}
-
-	/* Ranges: Simple case */
-	if( code == 206 &&  multipart_ranges == FALSE ) {
+	if( !http_range_multipart( p_range ) ) {
 		RESPONSE *r_head = NULL, *r_file = NULL;
 
 		/* Header */
 		if( ( r_head = resp_put( n->response, RESPONSE_FROM_MEMORY ) ) == NULL ) {
-			node_status( n, NODE_MODE_SHUTDOWN );
+			node_status( n, NODE_SHUTDOWN );
 			goto END;
 		}
 
 		/* File */
 		if( ( r_file = resp_put( n->response, RESPONSE_FROM_FILE ) ) == NULL ) {
-			node_status( n, NODE_MODE_SHUTDOWN );
+			node_status( n, NODE_SHUTDOWN );
 			goto END;
 		}
 
 		/* Parse range. */
 		if( !http_range_simple( n, r_file, filename, filesize, p_range,
 				&content_length ) ) {
-			node_status( n, NODE_MODE_SHUTDOWN );
+			node_status( n, NODE_SHUTDOWN );
 			goto END;
 		}
 
 		/* Header with known content_length */
 		http_206_simple( n, r_head, r_file, lastmodified, filename,
-				filesize, proto, content_length );
+				filesize, content_length, keepalive, mimetype );
 
 		info( &n->c_addr, code,	"%s [%s]", resource, range );
 		goto END;
-	}
-
-	/* Ranges advanced */
-	if( code == 206 && multipart_ranges == TRUE ) {
+	} else {
 		RESPONSE *r_head = NULL, *r_bottom = NULL, *r_zsyncbug = NULL;
 		char boundary[12];
 
@@ -370,32 +355,32 @@ void http_read( TCP_NODE *n, char *p_cmd, char *p_url, char *p_proto,
 
 		/* Header */
 		if( ( r_head = resp_put( n->response, RESPONSE_FROM_MEMORY ) ) == NULL ) {
-			node_status( n, NODE_MODE_SHUTDOWN );
+			node_status( n, NODE_SHUTDOWN );
 			goto END;
 		}
 
 		/* zsync bug? One more \r\n between header and body. */
 		if( ( r_zsyncbug = resp_put( n->response, RESPONSE_FROM_MEMORY ) ) == NULL ) {
-			node_status( n, NODE_MODE_SHUTDOWN );
+			node_status( n, NODE_SHUTDOWN );
 			goto END;
 		}
 
 		/* Parse range. */
-		if( !http_range_complex( n, filename, filesize, p_range, &content_length, boundary ) ) {
-			node_status( n, NODE_MODE_SHUTDOWN );
+		if( !http_range_complex( n, filename, filesize, mimetype, p_range, &content_length, boundary ) ) {
+			node_status( n, NODE_SHUTDOWN );
 			goto END;
 		}
 
 		/* Bottom */
 		if( ( r_bottom = resp_put( n->response, RESPONSE_FROM_MEMORY ) ) == NULL ) {
-			node_status( n, NODE_MODE_SHUTDOWN );
+			node_status( n, NODE_SHUTDOWN );
 			goto END;
 		}
 		http_206_boundary_finish( r_bottom, &content_length, boundary );
 
 		/* Header with known content_length */
 		http_206_complex( n, r_head, lastmodified, filename,
-				filesize, proto, content_length, boundary );
+				filesize, content_length, boundary, keepalive );
 
 
 		/* zsync bug? One more \r\n between header and body. */
@@ -407,14 +392,14 @@ void http_read( TCP_NODE *n, char *p_cmd, char *p_url, char *p_proto,
 	}
 
 	info( &n->c_addr, 500, "FIXME: HTTP parser end reached without result" );
-	node_status( n, NODE_MODE_SHUTDOWN );
+	node_status( n, NODE_SHUTDOWN );
 
 	END:
 
 	/* HTTP Pipeline: There is at least one more request to parse.
 	 * Recursive request! Limited by the input buffer.
 	 */
-	if( n->mode != NODE_MODE_SHUTDOWN && n->recv_size > 0 ) {
+	if( n->pipeline != NODE_SHUTDOWN && n->recv_size > 0 ) {
 		http_buf( n );
 	}
 }
@@ -435,36 +420,30 @@ void http_body( TCP_NODE *n, char *filename, size_t filesize ) {
 	r->data.file.f_stop = filesize - 1;
 }
 
-int http_action( TCP_NODE *n, char *p_cmd, int *action ) {
+int http_action( TCP_NODE *n, char *p_cmd ) {
 
-	/* Command */
 	if( strncmp( p_cmd, "GET", 3) == 0 ) {
-		*action = HTTP_GET;
-	} else if( strncmp( p_cmd, "HEAD", 4) == 0 ) {
-		*action = HTTP_HEAD;
-	} else {
-		info( &n->c_addr, 400, "Invalid request action: %s", p_cmd );
-		return FALSE;
+		return TRUE;
 	}
 
-	return TRUE;
+	info( &n->c_addr, 500, "Unsupported request action: %s", p_cmd );
+	return FALSE;
 }
 
-int http_proto( TCP_NODE *n, char *p_proto, int *proto ) {
+int http_proto( TCP_NODE *n, char *p_proto ) {
 
 	/* Protocol */
-	if( strncmp( p_proto, "HTTP/1.1", 8) != 0 &&
-			strncmp( p_proto, "HTTP/1.0", 8) != 0 ) {
-		info( &n->c_addr, 400, "Invalid protocol: %s", p_proto );
-		return FALSE;
-	}
 	if( strncmp( p_proto, "HTTP/1.1", 8) == 0 ) {
-		*proto = HTTP_1_1;
-	} else {
-		*proto = HTTP_1_0;
+		return TRUE;
 	}
 
-	return TRUE;
+	if( strncmp( p_proto, "HTTP/1.0", 8) == 0 ) {
+		return TRUE;
+	}
+
+	info( &n->c_addr, 500, "Unsupported protocol type: %s", p_proto );
+
+	return FALSE;
 }
 
 int http_resource( TCP_NODE *n, char *p_url, char *resource ) {
@@ -501,21 +480,23 @@ int http_filename( char *resource, char *filename ) {
 	snprintf( filename, BUF_SIZE, "%s%s", _main->conf->home, resource );
 
 	if( file_isreg( filename ) ) {
-		return 200;
+		return TRUE;
 	} else if( file_isdir( filename ) ) {
 		/* There is a index.html file within that directory? */
 		snprintf( filename, BUF_SIZE, "%s%s/%s",
 				_main->conf->home, resource, _main->conf->file );
 
 		if( file_isreg( filename ) ) {
-			return 200;
+			return TRUE;
 		}
 	}
 
-	return 404;
+	return FALSE;
 }
 
-int http_keepalive( HASH *head ) {
+int http_keepalive( HASH *head, char *keepalive ) {
+
+	memset( keepalive, '\0', BUF_SIZE );
 
 	if( ! hash_exists( head, (UCHAR *)"Connection",  10 ) ) {
 		return HTTP_UNDEF;
@@ -523,53 +504,55 @@ int http_keepalive( HASH *head ) {
 
 	if( strcasecmp( (char *)hash_get( head, (UCHAR *)"Connection", 10),
 			"keep-alive") == 0 ) {
+		strncpy( keepalive, "Connection: keep-alive\r\n", BUF_OFF1 );
 		return HTTP_KEEPALIVE;
 	}
 
 	if( strcasecmp( (char *)hash_get( head, (UCHAR *)"Connection", 10),
 			"close") == 0 ) {
+		strncpy( keepalive, "Connection: close\r\n", BUF_OFF1 );
 		return HTTP_CLOSE;
 	}
 
 	return HTTP_UNDEF;
 }
 
-int http_lastmodified( char *filename, HASH *head, int code, char *lastmodified ) {
+int http_resource_modified( char *filename, HASH *head, char *lastmodified ) {
 	str_gmttime( lastmodified, DATE_SIZE, file_mod( filename ) );
 
 	if( !hash_exists( head, (UCHAR *)"If-Modified-Since", 17 ) ) {
-		return code;
+		return TRUE;
 	}
 
 	if( strcmp( (char *)hash_get( head, (UCHAR *)"If-Modified-Since", 17 ),
 			lastmodified ) != 0 ) {
-		return code;
+		return TRUE;
 	}
 
-	return 304;
+	return FALSE;
 }
 
 void http_send( TCP_NODE *n ) {
-	if( n->mode == NODE_MODE_SHUTDOWN ) {
+	if( n->pipeline == NODE_SHUTDOWN ) {
 		return;
 	}
 
 	/* Prepare event system for sending data */
-	node_status( n, NODE_MODE_SEND_INIT );
+	node_status( n, NODE_SEND_INIT );
 
 	/* Start sending */
 	send_tcp( n );
 }
 
-int http_range( HASH *head, char *range ) {
+int http_range_detected( HASH *head, char *range ) {
 	if ( hash_exists(head, (UCHAR *)"Range", 5) ) {
 		memset( range, '\0', BUF_SIZE );
 		strncpy( range, (char *)hash_get( head, (UCHAR *)"Range", 5 ),
 				BUF_OFF1 );
-		return 206;
+		return TRUE;
 	}
 
-	return 200;
+	return FALSE;
 }
 
 int http_range_prepare( char **p_range ) {
@@ -591,7 +574,9 @@ size_t http_size_simple( char *filename ) {
 	return file_size(filename);
 }
 
-int http_range_simple( TCP_NODE *n, RESPONSE *r, char *filename, size_t filesize, char *p_range, size_t *content_length ) {
+int http_range_simple( TCP_NODE *n, RESPONSE *r,
+		char *filename, size_t filesize,
+		char *p_range, size_t *content_length ) {
 	char *p_start = NULL;
 	char *p_stop = NULL;
 	size_t range_start = 0;
@@ -606,11 +591,6 @@ int http_range_simple( TCP_NODE *n, RESPONSE *r, char *filename, size_t filesize
 	strncpy( range, p_range, BUF_OFF1);
 
 	strncpy( r->data.file.filename, filename, BUF_OFF1 );
-
-	/* Defaults */
-//	r->data.file.f_offset = 0;
-//	r->data.file.f_stop = filesize - 1;
-//	*content_length = filesize;
 
 	p_start = range;
 
@@ -658,8 +638,8 @@ int http_range_simple( TCP_NODE *n, RESPONSE *r, char *filename, size_t filesize
 	return TRUE;
 }
 
-
-int http_range_complex( TCP_NODE *n, char *filename, size_t filesize, char *p_range, size_t *content_length, char *boundary ) {
+int http_range_complex( TCP_NODE *n, char *filename, size_t filesize, const char *mimetype,
+		char *p_range, size_t *content_length, char *boundary ) {
 	char *p_start = NULL;
 	char *p_stop = NULL;
 	char range[BUF_SIZE];
@@ -697,7 +677,7 @@ int http_range_complex( TCP_NODE *n, char *filename, size_t filesize, char *p_ra
 	}
 
 	/* Create boundary header */
-	http_206_boundary_head( r_head, r_file, filename, filesize , boundary, content_length );
+	http_206_boundary_head( r_head, r_file, filename, filesize, mimetype, boundary, content_length );
 
 	/* Create boundary bottom */
 	http_newline( r_bottom, content_length );
@@ -705,264 +685,191 @@ int http_range_complex( TCP_NODE *n, char *filename, size_t filesize, char *p_ra
 	/* There is more to check */
 	if( p_stop != NULL ) {
 		p_start = p_stop + 1;
-		return http_range_complex( n, filename, filesize, p_start, content_length, boundary );
+		return http_range_complex( n, filename, filesize, mimetype, p_start, content_length, boundary );
 	}
 
 	return TRUE;
 }
 
-void http_404( TCP_NODE *n, int proto ) {
+void http_404( TCP_NODE *n, char *keepalive ) {
 	RESPONSE *r = resp_put( n->response, RESPONSE_FROM_MEMORY );
-	char protocol = ( proto == HTTP_1_1 ) ? '1' : '0';
-	char h_keepalive[] = "Connection: keep-alive\r\n";
 	char datebuf[DATE_SIZE];
 	char buffer[BUF_SIZE] =
-	"<!DOCTYPE html>"
-	"<html lang=\"en\" xml:lang=\"en\">"
-	"<head>"
-	"<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />"
-	"<title>Not found</title>"
-	"</head>"
-	"<body>"
-	"<h1>Not found</h1>"
-	"</body>"
-	"</html>";
+		"<!DOCTYPE html>"
+		"<html lang=\"en\" xml:lang=\"en\">"
+		"<head>"
+		"<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\" />"
+		"<title>Not found</title>"
+		"</head>"
+		"<body>"
+		"<h1>Not found</h1>"
+		"</body>"
+		"</html>";
 	int size = strlen( buffer );
 
 	if( r == NULL ){
 		return;
 	}
 
-	if( n->keepalive == FALSE ) {
-		h_keepalive[0] = '\0';
-	}
-
 	/* Compute GMT time */
 	str_GMTtime( datebuf, DATE_SIZE );
 
-	snprintf( r->data.memory.send_buf, BUF_SIZE,
-	"HTTP/1.%c 404 Not found\r\n"
-	"Date: %s\r\n"
-	"Server: %s\r\n"
-	"Content-Length: %i\r\n"
-	"Content-Type: text/html; charset=utf-8\r\n"
-	"%s"
-	"\r\n"
-	"%s",
-	protocol, datebuf, CONF_SRVNAME, size, h_keepalive, buffer );
-
-	r->data.memory.send_size = strlen( r->data.memory.send_buf );
+	resp_set_memory( r,
+		"HTTP/1.1 404 Not found\r\n"
+		"Date: %s\r\n"
+		"Server: %s\r\n"
+		"Content-Length: %i\r\n"
+		"Content-Type: text/html; charset=utf-8\r\n"
+		"%s"
+		"\r\n"
+		"%s",
+		datebuf, CONF_SRVNAME, size, keepalive, buffer );
 }
 
-void http_304( TCP_NODE *n, int proto ) {
+void http_304( TCP_NODE *n, char *keepalive ) {
 	RESPONSE *r = resp_put( n->response, RESPONSE_FROM_MEMORY );
 	char datebuf[DATE_SIZE];
-	char protocol = ( proto == HTTP_1_1 ) ? '1' : '0';
-	char h_keepalive[] = "Connection: keep-alive\r\n";
 
 	if( r == NULL ){
 		return;
 	}
 
-	if( n->keepalive == FALSE ) {
-		h_keepalive[0] = '\0';
-	}
-
 	/* Compute GMT time */
 	str_GMTtime( datebuf, DATE_SIZE );
 
-	snprintf( r->data.memory.send_buf, BUF_SIZE,
-	"HTTP/1.%c 304 Not Modified\r\n"
-	"Date: %s\r\n"
-	"Server: %s\r\n"
-	"%s"
-	"\r\n",
-	protocol, datebuf, CONF_SRVNAME, h_keepalive );
-
-	r->data.memory.send_size = strlen( r->data.memory.send_buf );
+	resp_set_memory( r,
+		"HTTP/1.1 304 Not Modified\r\n"
+		"Date: %s\r\n"
+		"Server: %s\r\n"
+		"%s"
+		"\r\n",
+		datebuf, CONF_SRVNAME, keepalive );
 }
 
-void http_200( TCP_NODE *n, char *lastmodified, char *filename, size_t filesize, int proto ) {
+void http_200( TCP_NODE *n, char *lastmodified, char *filename, size_t filesize,
+		char *keepalive, const char *mimetype ) {
 	RESPONSE *r = resp_put( n->response, RESPONSE_FROM_MEMORY );
 	char datebuf[DATE_SIZE];
-	const char *mimetype = NULL;
-	char protocol = ( proto == HTTP_1_1 ) ? '1' : '0';
-	char h_keepalive[] = "Connection: keep-alive\r\n";
 
 	if( r == NULL ){
 		return;
 	}
 
-	if( ! n->keepalive ) {
-		h_keepalive[0] = '\0';
-	}
-
 	/* Compute GMT time */
 	str_GMTtime( datebuf, DATE_SIZE );
-
-	/* Compute mime type */
-	mimetype = mime_find( filename );
 
 	/* Compute answer */
-	snprintf( r->data.memory.send_buf, BUF_SIZE,
-	"HTTP/1.%c 200 OK\r\n"
-	"Date: %s\r\n"
-	"Server: %s\r\n"
+	resp_set_memory( r,
+		"HTTP/1.1 200 OK\r\n"
+		"Date: %s\r\n"
+		"Server: %s\r\n"
 #ifdef __amd64__
-	"Content-Length: %lu\r\n"
+		"Content-Length: %lu\r\n"
 #else /* __i386__ __arm__ */
-	"Content-Length: %u\r\n"
+		"Content-Length: %u\r\n"
 #endif
-	"Content-Type: %s\r\n"
-	"Last-Modified: %s\r\n"
-	"Accept-Ranges: bytes\r\n"
-	"%s"
-	"\r\n",
-	protocol, datebuf, CONF_SRVNAME, filesize, mimetype, lastmodified, h_keepalive );
-
-	r->data.memory.send_size = strlen( r->data.memory.send_buf );
+		"Content-Type: %s\r\n"
+		"Last-Modified: %s\r\n"
+		"Accept-Ranges: bytes\r\n"
+		"%s"
+		"\r\n",
+		datebuf, CONF_SRVNAME, filesize, mimetype, lastmodified, keepalive );
 }
 
 void http_206_simple( TCP_NODE *n, RESPONSE *r_head, RESPONSE *r_file,
-		char *lastmodified, char *filename, size_t filesize, int proto, size_t content_length ) {
+		char *lastmodified, char *filename, size_t filesize, size_t content_length, char *keepalive, const char *mimetype ) {
 	char datebuf[DATE_SIZE];
-	const char *mimetype = NULL;
-	char protocol = ( proto == HTTP_1_1 ) ? '1' : '0';
-	char h_keepalive[] = "Connection: keep-alive\r\n";
 	size_t range_start = r_file->data.file.f_offset;
 	size_t range_stop = r_file->data.file.f_stop;
 
-	if( n->keepalive == FALSE ) {
-		h_keepalive[0] = '\0';
-	}
-
 	str_GMTtime( datebuf, DATE_SIZE );
-	mimetype = mime_find( filename );
 
-	snprintf( r_head->data.memory.send_buf, BUF_SIZE,
-	"HTTP/1.%c 206 OK\r\n"
-	"Date: %s\r\n"
-	"Server: %s\r\n"
+	resp_set_memory( r_head,
+		"HTTP/1.1 206 OK\r\n"
+		"Date: %s\r\n"
+		"Server: %s\r\n"
 #ifdef __amd64__
-	"Content-Length: %lu\r\n"
-	"Content-Range: bytes %lu-%lu/%lu\r\n"
+		"Content-Length: %lu\r\n"
+		"Content-Range: bytes %lu-%lu/%lu\r\n"
 #else /* __i386__ __arm__ */
-	"Content-Length: %u\r\n"
-	"Content-Range: bytes %u-%u/%u\r\n"
+		"Content-Length: %u\r\n"
+		"Content-Range: bytes %u-%u/%u\r\n"
 #endif
-	"Content-Type: %s\r\n"
-	"Last-Modified: %s\r\n"
-	"%s"
-	"\r\n",
-	protocol, datebuf, CONF_SRVNAME,
+		"Content-Type: %s\r\n"
+		"Last-Modified: %s\r\n"
+		"%s"
+		"\r\n",
+		datebuf, CONF_SRVNAME,
 #ifdef __amd64__
-	content_length,
-	range_start, range_stop, filesize,
+		content_length,
+		range_start, range_stop, filesize,
 #else /* __i386__ __arm__ */
-	content_length,
-	(unsigned int)range_start, (unsigned int)range_stop, filesize,
+		content_length,
+		(unsigned int)range_start, (unsigned int)range_stop, filesize,
 #endif
-	mimetype, lastmodified, h_keepalive);
-
-	r_head->data.memory.send_size = strlen( r_head->data.memory.send_buf );
+		mimetype, lastmodified, keepalive);
 }
 
 void http_206_complex( TCP_NODE *n, RESPONSE *r_head,
-		char *lastmodified, char *filename, size_t filesize, int proto,
-		size_t content_length, char *boundary ) {
+		char *lastmodified, char *filename, size_t filesize,
+		size_t content_length, char *boundary, char *keepalive ) {
 	char datebuf[DATE_SIZE];
-	char protocol = ( proto == HTTP_1_1 ) ? '1' : '0';
-	char h_keepalive[BUF_SIZE];
-
-	switch( n->keepalive ) {
-		case HTTP_KEEPALIVE:
-			strncpy( h_keepalive, "Connection: keep-alive\r\n", BUF_OFF1 );
-			break;
-		case HTTP_CLOSE:
-			strncpy( h_keepalive, "Connection: close\r\n", BUF_OFF1 );
-			strncpy( h_keepalive, "Connection: keep-alive\r\n", BUF_OFF1 );
-			break;
-		default:
-			h_keepalive[0] = '\0';
-	}
-
 
 	str_GMTtime( datebuf, DATE_SIZE );
 
-	snprintf( r_head->data.memory.send_buf, BUF_SIZE,
-	"HTTP/1.%c 206 Partial Content\r\n"
-	"Server: %s\r\n"
-	"Date: %s\r\n"
-	"Content-Type: multipart/byteranges; boundary=%s\r\n"
+	resp_set_memory( r_head,
+		"HTTP/1.1 206 Partial Content\r\n"
+		"Server: %s\r\n"
+		"Date: %s\r\n"
+		"Content-Type: multipart/byteranges; boundary=%s\r\n"
 #ifdef __amd64__
-	"Content-Length: %lu\r\n"
+		"Content-Length: %lu\r\n"
 #else /* __i386__ __arm__ */
-	"Content-Length: %u\r\n"
+		"Content-Length: %u\r\n"
 #endif
-	"Last-Modified: %s\r\n"
-	"%s"
-	"\r\n",
-	protocol,
-	CONF_SRVNAME,
-	datebuf,
-	boundary,
+		"Last-Modified: %s\r\n"
+		"%s"
+		"\r\n",
+		CONF_SRVNAME, datebuf, boundary,
 #ifdef __amd64__
-	content_length,
+		content_length,
 #else /* __i386__ __arm__ */
-	content_length,
+		content_length,
 #endif
-	lastmodified, h_keepalive);
-
-	r_head->data.memory.send_size = strlen( r_head->data.memory.send_buf );
+		lastmodified, keepalive );
 }
 
 void http_206_boundary_head( RESPONSE *r_head, RESPONSE *r_file,
-		char *filename, size_t filesize,
+		char *filename, size_t filesize, const char *mimetype,
 		char *boundary, size_t *content_size ) {
-	const char *mimetype = NULL;
 	size_t range_start = r_file->data.file.f_offset;
 	size_t range_stop = r_file->data.file.f_stop;
 
-	mimetype = mime_find( filename );
-
-	snprintf( r_head->data.memory.send_buf, BUF_SIZE,
-	"--%s\r\n"
-	"Content-Type: %s\r\n"
+	*content_size += resp_set_memory( r_head,
+		"--%s\r\n"
+		"Content-Type: %s\r\n"
 #ifdef __amd64__
-	"Content-Range: bytes %lu-%lu/%lu\r\n"
+		"Content-Range: bytes %lu-%lu/%lu\r\n"
 #else /* __i386__ __arm__ */
-	"Content-Range: bytes %u-%u/%u\r\n"
+		"Content-Range: bytes %u-%u/%u\r\n"
 #endif
-	"\r\n",
-	boundary,
-	mimetype,
+		"\r\n",
+		boundary, mimetype,
 #ifdef __amd64__
-	range_start, range_stop, filesize
+		range_start, range_stop, filesize
 #else /* __i386__ __arm__ */
-	(unsigned int)range_start, (unsigned int)range_stop, filesize
+		(unsigned int)range_start, (unsigned int)range_stop, filesize
 #endif
 	);
-
-	r_head->data.memory.send_size = strlen( r_head->data.memory.send_buf );
-
-	*content_size += r_head->data.memory.send_size;
 }
 
 void http_newline( RESPONSE *r, size_t *content_size ) {
-	r->data.memory.send_buf[0] = '\r';
-	r->data.memory.send_buf[1] = '\n';
-	r->data.memory.send_buf[2] = '\0';
-	r->data.memory.send_size = 2;
-	*content_size += 2;
+	*content_size += resp_set_memory( r, "\r\n" );
 }
 
 void http_206_boundary_finish( RESPONSE *r, size_t *content_length,
 	char *boundary ) {
-
-	snprintf( r->data.memory.send_buf, BUF_SIZE, "--%s--\r\n", boundary );
-	r->data.memory.send_size = strlen( r->data.memory.send_buf );
-
-	*content_length += r->data.memory.send_size;
+	*content_length += resp_set_memory( r, "--%s--\r\n", boundary );
 }
 
 void http_random( char *boundary, int size ) {

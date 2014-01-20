@@ -46,7 +46,7 @@ void node_free( void ) {
 
 	while( ( i = list_start( _main->node ) ) != NULL ) {
 		n = list_value( i );
-		node_status( n, NODE_MODE_SHUTDOWN );
+		node_status( n, NODE_SHUTDOWN );
 		node_shutdown( i );
 	}
 
@@ -66,7 +66,7 @@ ITEM *node_put( void ) {
 	n->recv_size = 0;
 
 	/* Connection status */
-	n->mode = NODE_MODE_READY;
+	n->pipeline = NODE_READY;
 
 	/* keepalive */
 	n->keepalive = HTTP_UNDEF;
@@ -123,7 +123,7 @@ void node_disconnect( int connfd ) {
 }
 
 void node_status( TCP_NODE *n, int status ) {
-	n->mode = status;
+	n->pipeline = status;
 }
 
 void node_clearRecvBuf( TCP_NODE *n ) {

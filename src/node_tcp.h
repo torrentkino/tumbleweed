@@ -27,14 +27,11 @@ along with torrentkino.  If not, see <http://www.gnu.org/licenses/>.
 #include "log.h"
 #include "response.h"
 
-#define NODE_MODE_READY   	1
-#define NODE_MODE_SEND_INIT 2
-#define NODE_MODE_SEND_DATA 3
-#define NODE_MODE_SEND_STOP 4
-#define NODE_MODE_SHUTDOWN  5
-
-#define NODE_HANDSHAKE_READY 0
-#define NODE_HANDSHAKE_ESTABLISHED 1
+#define NODE_READY		1
+#define NODE_SEND_INIT	2
+#define NODE_SEND_DATA	3
+#define NODE_SEND_STOP	4
+#define NODE_SHUTDOWN 	5
 
 typedef struct {
 	int connfd;
@@ -49,7 +46,7 @@ typedef struct {
 	int keepalive;
 
 	/* Pipeline */
-	int mode;
+	int pipeline;
 
 	/* Response list */
 	LIST *response;
