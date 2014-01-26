@@ -42,7 +42,7 @@ along with torrentkino.  If not, see <http://www.gnu.org/licenses/>.
 #include "http.h"
 #include "send_tcp.h"
 
-long int http_urlDecode( char *src, long int srclen, char *dst, long int dstlen ) {
+LONG http_urlDecode( char *src, LONG srclen, char *dst, LONG dstlen ) {
 	int i = 0, j = 0;
 	char *p1 = NULL;
 	char *p2 = NULL;
@@ -73,7 +73,7 @@ long int http_urlDecode( char *src, long int srclen, char *dst, long int dstlen 
 			j++;
 		} else if( *p1 == '%' ) {
 			/* Safety check */
-			if( (long int)(src+srclen-p1) <= 2 ) {
+			if( (LONG)(src+srclen-p1) <= 2 ) {
 				/* Path is broken: There should have been two more characters */
 				info( NULL, 500, "http_urlDecode(): Broken url" );
 				return 0;

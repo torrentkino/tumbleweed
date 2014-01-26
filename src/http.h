@@ -29,8 +29,7 @@ along with torrentkino.  If not, see <http://www.gnu.org/licenses/>.
 #define HTTP_1_0 10
 #define HTTP_1_1 11
 
-long int http_urlDecode( char *src, long int srclen, char *dst,
-		long int dstlen );
+LONG http_urlDecode( char *src, LONG srclen, char *dst,	LONG dstlen );
 HASH *http_hashHeader( char *head );
 void http_deleteHeader( HASH *head );
 
@@ -55,7 +54,8 @@ size_t http_size_simple( char *filename );
 int http_range_simple( TCP_NODE *n, RESPONSE *r,
 		char *filename, size_t filesize,
 		char *p_range, size_t *content_length );
-int http_range_complex( TCP_NODE *n, char *filename, size_t filesize, const char *mimetype,
+int http_range_complex( TCP_NODE *n, char *filename, size_t filesize,
+		const char *mimetype,
 		char *p_range, size_t *content_length, char *boundary );
 
 void http_404( TCP_NODE *n, char *keepalive );
