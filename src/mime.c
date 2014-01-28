@@ -169,7 +169,7 @@ void mime_magic( char *filename, char *key ) {
 	if( (magic = magic_open( MAGIC_ERROR|MAGIC_MIME)) == NULL ) {
 		return;
 	}
-  
+
 	if( magic_load( magic,NULL) != 0 ) {
 		magic_close( magic );
 		return;
@@ -179,16 +179,16 @@ void mime_magic( char *filename, char *key ) {
 		magic_close( magic );
 		return;
 	}
-	
+
 	/* Cache mime type in memory */
 	mutex_block( _main->mime->mutex );
 	tuple = mime_add( key, mime );
 	mutex_unblock( _main->mime->mutex );
-	
+
 	/* Clear handle */
 	magic_close( magic );
 
-	info( NULL, 0, "New MIME: \"%s\" -> \"%s\"", tuple->key, tuple->val );
+	info( NULL, "New MIME: \"%s\" -> \"%s\"", tuple->key, tuple->val );
 }
 #endif
 
@@ -202,7 +202,7 @@ char *mime_extension( char *filename ) {
 		key = dot+1;
 		i++;
 	}
-	
+
 	/* No '.' found */
 	if( i == 0 ) {
 		return NULL;

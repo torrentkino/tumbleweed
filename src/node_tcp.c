@@ -111,14 +111,14 @@ void node_disconnect( int connfd ) {
 	/* Remove FD from the watchlist */
 	if( epoll_ctl( _main->tcp->epollfd, EPOLL_CTL_DEL, connfd, NULL ) == -1 ) {
 		if( status == RUMBLE ) {
-			info( NULL, 500, strerror( errno ) );
+			info( NULL, strerror( errno ) );
 			fail( "node_shutdown: epoll_ctl() failed" );
 		}
 	}
 
 	/* Close socket */
 	if( close( connfd ) != 0 ) {
-		info( NULL, 500, "close() failed" );
+		info( NULL, "close() failed" );
 	}
 }
 
