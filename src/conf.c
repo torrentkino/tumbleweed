@@ -72,7 +72,7 @@ struct obj_conf *conf_init( int argc, char **argv ) {
 	/* Port */
 	value = ben_dict_search_str( opts, "-p" );
 	if( ben_is_str( value ) && ben_str_i( value ) >= 1 ) {
-		conf->port = atoi( (char *)ben_str_s( value ) );
+		conf->port = str_safe_port( (char *)ben_str_s( value ) );
 	} else {
 #ifdef TUMBLEWEED
 		if( getuid() == 0 ) {
@@ -84,7 +84,7 @@ struct obj_conf *conf_init( int argc, char **argv ) {
 		conf->port = PORT_DHT_DEFAULT;
 #endif
 	}
-	if( conf->port < CONF_PORTMIN || conf->port > CONF_PORTMAX ) {
+	if( conf->port == 0 ) {
 		fail( "Invalid port number (-p)" );
 	}
 
@@ -131,7 +131,7 @@ struct obj_conf *conf_init( int argc, char **argv ) {
 	/* Announce this port */
 	value = ben_dict_search_str( opts, "-b" );
 	if( ben_is_str( value ) && ben_str_i( value ) >= 1 ) {
-		conf->announce_port = atoi( (char *)ben_str_s( value ) );
+		conf->announce_port = str_safe_port( (char *)ben_str_s( value ) );
 	} else {
 		if( getuid() == 0 ) {
 			conf->announce_port = PORT_WWW_PRIV;
@@ -139,7 +139,7 @@ struct obj_conf *conf_init( int argc, char **argv ) {
 			conf->announce_port = PORT_WWW_USER;
 		}
 	}
-	if( conf->announce_port < CONF_PORTMIN || conf->announce_port > CONF_PORTMAX ) {
+	if( conf->announce_port == 0 ) {
 		fail( "Invalid announce port number. (-a)" );
 	}
 
@@ -166,20 +166,28 @@ struct obj_conf *conf_init( int argc, char **argv ) {
 
 	memset( conf->null_id, '\0', SHA1_SIZE );
 
-	/* Bootstrap node */
+	/* Bootstrap node:
+	 * -x overwrites everything
+	 * -l sets a default internet bootstrap server
+	 * Last resort: Use multicast
+	 */
 	value = ben_dict_search_str( opts, "-x" );
 	if( ben_is_str( value ) && ben_str_i( value ) >= 1 ) {
-		snprintf( conf->bootstrap_node, BUF_SIZE, "%s", (char *)ben_str_s( value ) );
+		snprintf( conf->bootstrap_node, BUF_SIZE, "%s",
+			(char *)ben_str_s( value ) );
 	} else {
-		snprintf( conf->bootstrap_node, BUF_SIZE, "%s", CONF_MULTICAST );
+		if( ben_dict_search_str( opts, "-l" ) != NULL ) {
+			snprintf( conf->bootstrap_node, BUF_SIZE, "%s", BOOTSTRAP_DEFAULT );
+		} else {
+			snprintf( conf->bootstrap_node, BUF_SIZE, "%s", MULTICAST_DEFAULT );
+		}
 	}
 
 	/* Bootstrap port */
 	value = ben_dict_search_str( opts, "-y" );
 	if( ben_is_str( value ) && ben_str_i( value ) >= 1 ) {
-		if( str_isSafePort( (char *)ben_str_s( value ) ) != -1 ) {
-			conf->bootstrap_port = atoi( (char *)ben_str_s( value ) );
-		} else {
+		conf->bootstrap_port = str_safe_port( (char *)ben_str_s( value ) );
+		if( conf->bootstrap_port == 0 ) {
 			conf->bootstrap_port = PORT_DHT_DEFAULT;
 		}
 	} else {
@@ -356,7 +364,7 @@ void conf_print( void ) {
 	hex_hash_encode( hex, _main->conf->host_id );
 	info( NULL, "Host ID: %s", hex );
 
-	info( NULL, "Bootstrap node: %s (-x)", _main->conf->bootstrap_node );
+	info( NULL, "Bootstrap node: %s (-x/-l)", _main->conf->bootstrap_node );
 	info( NULL, "Bootstrap port: UDP/%i (-y)", _main->conf->bootstrap_port );
 	info( NULL, "Announce port: %i (-a)", _main->conf->announce_port );
 	if( _main->conf->strict ) {
