@@ -23,8 +23,8 @@ actually really fast. It has only a limited HTTP feature set though.
   * `-i` *index*:
 	Serve this file if the requested entity is a directory. (Default: index.html)
 
-  * `-d`:
-	Start as a daemon and run in background. The output will be send to syslog.
+  * `-f`:
+	Fork a daemon and run in background. The output will be send to syslog.
 
   * `-q`:
 	Be quiet and do not log anything.
