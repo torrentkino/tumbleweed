@@ -29,9 +29,6 @@ actually really fast. It has only a limited HTTP feature set though.
   * `-q`:
 	Be quiet and do not log anything.
 
-  * `-6`:
-	IPv6 only.
-
 ## EXAMPLES
 
 Serve *~/Public* at port *8080*:
