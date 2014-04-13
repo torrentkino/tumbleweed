@@ -3,7 +3,7 @@ tumbleweed(1) -- Instant webserver
 
 ## SYNOPSIS
 
-`tumbleweed` [-d] [-q] [-6] [-w workdir] [-p port] [-i index]
+`tumbleweed` [-f] [-q] [-w workdir] [-p port] [-i index]
 
 ## DESCRIPTION
 
