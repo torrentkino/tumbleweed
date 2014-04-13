@@ -24,7 +24,6 @@ along with torrentkino.  If not, see <http://www.gnu.org/licenses/>.
 #include "malloc.h"
 #include "fail.h"
 #include "file.h"
-#include "opts.h"
 
 #include "unix.h"
 #include "str.h"
@@ -45,8 +44,10 @@ void conf_free( void );
 void conf_print( void );
 void conf_write( void );
 
-void conf_home( struct obj_conf *conf, BEN *opts );
+void conf_home_from_env( struct obj_conf *conf );
+void conf_home_from_arg( struct obj_conf *conf, char *optarg );
 int conf_verbosity( void );
 int conf_mode( void );
+void conf_usage( char *command );
 
 #endif

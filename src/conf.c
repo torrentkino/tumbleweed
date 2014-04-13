@@ -24,6 +24,7 @@ along with torrentkino.  If not, see <http://www.gnu.org/licenses/>.
 #include <netinet/in.h>
 #include <signal.h>
 #include <unistd.h>
+#include <getopt.h>
 
 #include "tumbleweed.h"
 #include "str.h"
@@ -36,67 +37,58 @@ along with torrentkino.  If not, see <http://www.gnu.org/licenses/>.
 #include "conf.h"
 
 struct obj_conf *conf_init( int argc, char **argv ) {
-	struct obj_conf *conf = (struct obj_conf *) myalloc( sizeof(struct obj_conf) );
-	BEN *opts = opts_init();
-	BEN *value = NULL;
+	struct obj_conf *conf = myalloc( sizeof(struct obj_conf) );
+	int opt = 0;
 
-	/* Parse command line */
-	opts_load( opts, argc, argv );
+	/* Defaults */
+	conf->mode = CONF_CONSOLE;
+	conf->verbosity = CONF_VERBOSE;
+	conf->port = ( getuid() == 0 ) ? PORT_WWW_PRIV : PORT_WWW_USER;
+	conf->cores = unix_cpus();
+	strncpy( conf->file, CONF_INDEX_NAME, BUF_OFF1 );
+	conf_home_from_env( conf );
 
-	/* Mode */
-	if( ben_dict_search_str( opts, "-f" ) != NULL ) {
-		conf->mode = CONF_DAEMON;
-	} else {
-		conf->mode = CONF_CONSOLE;
-	}
-
-	/* Verbosity */
-	if( ben_dict_search_str( opts, "-v" ) != NULL ) {
-		conf->verbosity = CONF_VERBOSE;
-	} else if ( ben_dict_search_str( opts, "-q" ) != NULL ) {
-		conf->verbosity = CONF_BEQUIET;
-	} else {
-		/* Be verbose in the console and quiet while running as a daemon. */
-		conf->verbosity = ( conf->mode == CONF_CONSOLE ) ?
-			CONF_VERBOSE : CONF_BEQUIET;
-	}
-
-	/* Port */
-	value = ben_dict_search_str( opts, "-p" );
-	if( ben_is_str( value ) && ben_str_i( value ) >= 1 ) {
-		conf->port = str_safe_port( (char *)ben_str_s( value ) );
-	} else {
-		if( getuid() == 0 ) {
-			conf->port = PORT_WWW_PRIV;
-		} else {
-			conf->port = PORT_WWW_USER;
+	/* Arguments */
+	while( ( opt = getopt( argc, argv, "fhi:p:qw:" ) ) != -1 ) {
+		switch( opt ) {
+			case 'f':
+				conf->mode = CONF_DAEMON;
+				break;
+			case 'h':
+				conf_usage( argv[0] );
+				break;
+			case 'i':
+				snprintf( conf->file, BUF_SIZE, "%s", optarg );
+				break;
+			case 'p':
+				conf->port = str_safe_port( optarg );
+				break;
+			case 'q':
+				conf->verbosity = CONF_BEQUIET;
+				break;
+			case 'w':
+				conf_home_from_arg( conf, optarg );
+				break;
+			default: /* '?' */
+				conf_usage( argv[0] );
 		}
 	}
+
 	if( conf->port == 0 ) {
 		fail( "Invalid port number (-p)" );
 	}
 
-	/* Cores */
-	conf->cores = unix_cpus();
 	if( conf->cores < 1 || conf->cores > 128 ) {
 		fail( "Invalid number of CPU cores" );
 	}
 
-	/* HOME */
-	conf_home( conf, opts );
-
-	/* HTML index */
-	value = ben_dict_search_str( opts, "-i" );
-	if( ben_is_str( value ) && ben_str_i( value ) >= 1 ) {
-		snprintf( conf->file, BUF_SIZE, "%s", (char *)ben_str_s( value ) );
-	} else {
-		snprintf( conf->file, BUF_SIZE, "%s", CONF_INDEX_NAME );
+	if( !file_isdir( conf->home ) ) {
+		fail( "%s does not exist", conf->home );
 	}
+
 	if( !str_isValidFilename( conf->file ) ) {
 		fail( "Index %s looks suspicious", conf->file );
 	}
-
-	opts_free( opts );
 
 	return conf;
 }
@@ -105,33 +97,24 @@ void conf_free( void ) {
 	myfree( _main->conf );
 }
 
-void conf_home( struct obj_conf *conf, BEN *opts ) {
-	BEN *value = NULL;
-
-	value = ben_dict_search_str( opts, "-w" );
-	if( ben_is_str( value ) && ben_str_i( value ) >= 1 ) {
-		char *p = NULL;
-
-		p = (char *)ben_str_s( value );
-
-		/* Absolute path or relative path */
-		if( *p == '/' ) {
-			snprintf( conf->home, BUF_SIZE, "%s", p );
-		} else if ( getenv( "PWD" ) != NULL ) {
-			snprintf( conf->home, BUF_SIZE, "%s/%s", getenv( "PWD" ), p );
-		} else {
-			strncpy( conf->home, "/var/www", BUF_OFF1 );
-		}
+void conf_home_from_env( struct obj_conf *conf ) {
+	if( getenv( "HOME" ) == NULL || getuid() == 0 ) {
+		strncpy( conf->home, "/var/www", BUF_OFF1 );
 	} else {
-		if( getenv( "HOME" ) == NULL || getuid() == 0 ) {
-			strncpy( conf->home, "/var/www", BUF_OFF1 );
-		} else {
-			snprintf( conf->home, BUF_SIZE, "%s/%s", getenv( "HOME"), "Public" );
-		}
+		snprintf( conf->home, BUF_SIZE, "%s/%s", getenv( "HOME"), "Public" );
 	}
+}
 
-	if( !file_isdir( conf->home ) ) {
-		fail( "%s does not exist", conf->home );
+void conf_home_from_arg( struct obj_conf *conf, char *optarg ) {
+	char *p = optarg;
+
+	/* Absolute path or relative path */
+	if( *p == '/' ) {
+		snprintf( conf->home, BUF_SIZE, "%s", p );
+	} else if ( getenv( "PWD" ) != NULL ) {
+		snprintf( conf->home, BUF_SIZE, "%s/%s", getenv( "PWD" ), p );
+	} else {
+		strncpy( conf->home, "/var/www", BUF_OFF1 );
 	}
 }
 
@@ -142,7 +125,9 @@ void conf_print( void ) {
 		info( NULL, "# to use 'sudo -E' to export some variables like $HOME or $PWD." );
 	}
 
-	info( NULL, "Cores: %i", _main->conf->cores );
+	info( NULL, "Workdir: %s (-w)", _main->conf->home );
+	info( NULL, "Index file: %s (-i)", _main->conf->file );
+	info( NULL, "Listen to TCP/%i (-p)", _main->conf->port );
 
 	if( _main->conf->mode == CONF_CONSOLE ) {
 		info( NULL, "Mode: Console (-f)" );
@@ -151,16 +136,12 @@ void conf_print( void ) {
 	}
 
 	if( _main->conf->verbosity == CONF_BEQUIET ) {
-		info( NULL, "Verbosity: Quiet (-q/-v)" );
+		info( NULL, "Verbosity: Quiet (-q)" );
 	} else {
-		info( NULL, "Verbosity: Verbose (-q/-v)" );
+		info( NULL, "Verbosity: Verbose (-q)" );
 	}
 
-	info( NULL, "Workdir: %s (-w)", _main->conf->home );
-
-	info( NULL, "Index file: %s (-i)", _main->conf->file );
-
-	info( NULL, "Listen to TCP/%i (-p)", _main->conf->port );
+	info( NULL, "Cores: %i", _main->conf->cores );
 }
 
 int conf_verbosity( void ) {
@@ -169,4 +150,8 @@ int conf_verbosity( void ) {
 
 int conf_mode( void ) {
 	return _main->conf->mode;
+}
+
+void conf_usage( char *command ) {
+	fail( "Usage: %s [-f] [-q] [-w workdir] [-p port] [-i index]", command );
 }
