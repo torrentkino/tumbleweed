@@ -27,7 +27,6 @@ along with torrentkino.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "unix.h"
 #include "str.h"
-#include "ben.h"
 
 struct obj_conf {
 	char home[BUF_SIZE];
