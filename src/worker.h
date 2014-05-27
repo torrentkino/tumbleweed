@@ -34,10 +34,8 @@ struct obj_work {
 	pthread_attr_t attr;
 	pthread_mutex_t *mutex;
 
-#ifdef TUMBLEWEED
 	/* TCP nodes */
 	pthread_mutex_t *tcp_node;
-#endif
 };
 
 struct obj_work *work_init( void );
