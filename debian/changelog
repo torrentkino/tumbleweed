@@ -1,3 +1,9 @@
+tumbleweed (0.7) wheezy; urgency=low
+
+  * Support non-option parameters to remove the -w option.
+  * Added -d, removed -f.
+
+ -- Aiko Barz <aiko@torrentkino.de>  Thu, 12 Jun 2014 22:11:00 +0100
 tumbleweed (0.6) wheezy; urgency=low
 
   * Added range requests again.

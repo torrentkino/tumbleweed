@@ -1,22 +1,18 @@
 .\" generated with Ronn/v0.7.3
 .\" http://github.com/rtomayko/ronn/tree/0.7.3
 .
-.TH "TUMBLEWEED" "1" "April 2014" "" ""
+.TH "TUMBLEWEED" "1" "June 2014" "" ""
 .
 .SH "NAME"
 \fBtumbleweed\fR \- Instant webserver
 .
 .SH "SYNOPSIS"
-\fBtumbleweed\fR [\-f] [\-q] [\-w workdir] [\-p port] [\-i index]
+\fBtumbleweed\fR [\-f] [\-q] [\-p port] [\-i index] workdir
 .
 .SH "DESCRIPTION"
-\fBtumbleweed\fR is a simple webserver for static content with a low memory footprint for the Linux OS\. It uses the Linux EPOLL event system, does non\-blocking IO, supports Zero\-Copy and uses all the cores you have\. It is actually really fast\. It has only a limited HTTP feature set though\.
+\fBtumbleweed\fR is a simple webserver for static content with a low memory footprint for the Linux OS\. It uses the Linux EPOLL event system, does non\-blocking IO, supports Zero\-Copy and uses all the cores you have\. It is actually really fast\. It has a limited HTTP feature set though\. Range requests, even multi range requests, are supported\. Pipelined HTTP requests are supported as well\. On the fly compression is not supported\.
 .
 .SH "OPTIONS"
-.
-.TP
-\fB\-w\fR \fIworkdir\fR
-Share this directory\. (Default: ~/Public)
 .
 .TP
 \fB\-p\fR \fIport\fR
@@ -27,7 +23,7 @@ Listen to this port\. (Default: TCP/8080)
 Serve this file if the requested entity is a directory\. (Default: index\.html)
 .
 .TP
-\fB\-f\fR
+\fB\-d\fR
 Fork a daemon and run in background\. The output will be send to syslog\.
 .
 .TP
@@ -42,6 +38,19 @@ Serve \fI~/Public\fR at port \fI8080\fR:
 .nf
 
 $ tumbleweed
+.
+.fi
+.
+.IP "" 0
+.
+.P
+Serve a jekyll generated site at port \fI80\fR\. tumbleweed will set its UID to nobody when started with root privileges\.
+.
+.IP "" 4
+.
+.nf
+
+$ sudo \-E tumbleweed \-p 80 /var/www/jekyll/_site
 .
 .fi
 .

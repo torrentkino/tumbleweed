@@ -39,6 +39,7 @@ along with torrentkino.  If not, see <http://www.gnu.org/licenses/>.
 struct obj_conf *conf_init( int argc, char **argv ) {
 	struct obj_conf *conf = myalloc( sizeof(struct obj_conf) );
 	int opt = 0;
+	int i = 0;
 
 	/* Defaults */
 	conf->mode = CONF_CONSOLE;
@@ -49,9 +50,9 @@ struct obj_conf *conf_init( int argc, char **argv ) {
 	conf_home_from_env( conf );
 
 	/* Arguments */
-	while( ( opt = getopt( argc, argv, "fhi:p:qw:" ) ) != -1 ) {
+	while( ( opt = getopt( argc, argv, "dhi:p:q" ) ) != -1 ) {
 		switch( opt ) {
-			case 'f':
+			case 'd':
 				conf->mode = CONF_DAEMON;
 				break;
 			case 'h':
@@ -66,12 +67,14 @@ struct obj_conf *conf_init( int argc, char **argv ) {
 			case 'q':
 				conf->verbosity = CONF_BEQUIET;
 				break;
-			case 'w':
-				conf_home_from_arg( conf, optarg );
-				break;
 			default: /* '?' */
 				conf_usage( argv[0] );
 		}
+	}
+
+	/* Get non-option values. */
+	for( i=optind; i<argc; i++ ) {
+		conf_home_from_arg( conf, argv[i] );
 	}
 
 	if( conf->port == 0 ) {
@@ -125,14 +128,14 @@ void conf_print( void ) {
 		info( NULL, "# to use 'sudo -E' to export some variables like $HOME or $PWD." );
 	}
 
-	info( NULL, "Workdir: %s (-w)", _main->conf->home );
+	info( NULL, "Workdir: %s", _main->conf->home );
 	info( NULL, "Index file: %s (-i)", _main->conf->file );
 	info( NULL, "Listen to TCP/%i (-p)", _main->conf->port );
 
 	if( _main->conf->mode == CONF_CONSOLE ) {
-		info( NULL, "Mode: Console (-f)" );
+		info( NULL, "Mode: Console (-d)" );
 	} else {
-		info( NULL, "Mode: Daemon (-f)" );
+		info( NULL, "Mode: Daemon (-d)" );
 	}
 
 	if( _main->conf->verbosity == CONF_BEQUIET ) {
@@ -153,5 +156,5 @@ int conf_mode( void ) {
 }
 
 void conf_usage( char *command ) {
-	fail( "Usage: %s [-f] [-q] [-w workdir] [-p port] [-i index]", command );
+	fail( "Usage: %s [-d] [-q] [-p port] [-i index] workdir", command );
 }

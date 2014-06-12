@@ -116,9 +116,7 @@ int main( int argc, char **argv ) {
 	unix_signal( &sig_stop, &sig_time );
 
 	/* Fork daemon */
-	if( _main->conf->mode == CONF_DAEMON ) {
-		unix_fork();
-	}
+	unix_fork( _main->conf->mode );
 
 #ifdef TORRENTKINO
 	/* Write configuration */

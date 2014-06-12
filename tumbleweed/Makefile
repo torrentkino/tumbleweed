@@ -6,7 +6,7 @@ CFLAGS += -DMAGIC
 #CFLAGS += -g
 LDFLAGS = -lpthread
 LDFLAGS += -lmagic
-OBJS = conf.o fail.o file.o hash.o http.o list.o log.o \
+OBJS = conf.o fail.o file.o hash.o http.o ip.o list.o log.o \
 	malloc.o mime.o node_tcp.o response.o \
 	send_tcp.o str.o tcp.o thrd.o tumbleweed.o unix.o \
 	worker.o

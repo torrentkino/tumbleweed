@@ -723,7 +723,7 @@ void http_404( TCP_NODE *n, char *keepalive ) {
 		"%s"
 		"\r\n"
 		"%s",
-		datebuf, CONF_SRVNAME, size, keepalive, buffer );
+		datebuf, LOG_NAME, size, keepalive, buffer );
 }
 
 void http_304( TCP_NODE *n, char *keepalive ) {
@@ -743,7 +743,7 @@ void http_304( TCP_NODE *n, char *keepalive ) {
 		"Server: %s\r\n"
 		"%s"
 		"\r\n",
-		datebuf, CONF_SRVNAME, keepalive );
+		datebuf, LOG_NAME, keepalive );
 }
 
 void http_200( TCP_NODE *n, char *lastmodified, char *filename, size_t filesize,
@@ -773,7 +773,7 @@ void http_200( TCP_NODE *n, char *lastmodified, char *filename, size_t filesize,
 		"Accept-Ranges: bytes\r\n"
 		"%s"
 		"\r\n",
-		datebuf, CONF_SRVNAME, filesize, mimetype, lastmodified, keepalive );
+		datebuf, LOG_NAME, filesize, mimetype, lastmodified, keepalive );
 }
 
 void http_206_simple( TCP_NODE *n, RESPONSE *r_head, RESPONSE *r_file,
@@ -799,7 +799,7 @@ void http_206_simple( TCP_NODE *n, RESPONSE *r_head, RESPONSE *r_file,
 		"Last-Modified: %s\r\n"
 		"%s"
 		"\r\n",
-		datebuf, CONF_SRVNAME,
+		datebuf, LOG_NAME,
 #ifdef __amd64__
 		content_length,
 		range_start, range_stop, filesize,
@@ -830,7 +830,7 @@ void http_206_complex( TCP_NODE *n, RESPONSE *r_head,
 		"Last-Modified: %s\r\n"
 		"%s"
 		"\r\n",
-		CONF_SRVNAME, datebuf, boundary,
+		LOG_NAME, datebuf, boundary,
 #ifdef __amd64__
 		content_length,
 #else /* __i386__ __arm__ */
